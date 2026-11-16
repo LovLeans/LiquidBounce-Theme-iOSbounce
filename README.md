@@ -5,9 +5,7 @@ It is a fork of CCBlueX's [LiquidBounce-Theme](https://github.com/CCBlueX/Liquid
 
 ## Download
 
-**[Download the latest build](../../releases/latest/download/iosbounce.zip)**: compiled from the newest commit, no GitHub login needed.
-
-Every commit is also built by [GitHub Actions](../../actions): open the newest run and take the zip under *Artifacts*.
+**[Download the latest build](../../releases/latest/download/iosbounce.zip)**: compiled from the newest commit.
 
 ### Install
 
