@@ -1,0 +1,94 @@
+name: Release
+
+# Runs when you publish a GitHub release (Releases -> Draft a new release -> new tag such as v0.1.0 -> Publish release).
+#   1. builds the theme and attaches <theme id>.zip to that release
+#   2. uploads that version to the LiquidBounce Marketplace (skipped for pre-releases, and when API_TOKEN is not set)
+# The tag must match "version" in public/metadata.json (v0.1.0 <-> 0.1.0), otherwise the run stops before publishing.
+# The rolling "Latest build" release made by build.yml is ignored here.
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write   # to attach the zip to the release
+
+env:
+  # Item ID of the theme on liquidbounce.net (the number in ".marketplace subscribe <id>").
+  # Override it with a repository variable named MARKETPLACE_ITEM_ID if it ever changes.
+  MARKETPLACE_ITEM_ID: ${{ vars.MARKETPLACE_ITEM_ID || '896' }}
+
+jobs:
+  release:
+    if: github.event.release.tag_name != 'latest'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+
+      - name: Check the tag matches the theme version
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          test -f dist/metadata.json || { echo "::error::dist/metadata.json is missing, the build is incomplete"; exit 1; }
+          VERSION="$(jq -r .version dist/metadata.json)"
+          if [ "${TAG#v}" != "$VERSION" ]; then
+            echo "::error::Release tag '$TAG' does not match the theme version '$VERSION' in public/metadata.json. Change one of them (and delete the tag if you used a wrong one)."
+            exit 1
+          fi
+
+      - name: Package the theme
+        run: |
+          ID="$(jq -r .id dist/metadata.json)"
+          echo "THEME_ID=$ID" >> "$GITHUB_ENV"
+          # 1. For people downloading from GitHub: a folder named like the theme, ready for the client's themes folder
+          mkdir -p pkg
+          cp -r dist "pkg/$ID"
+          (cd pkg && zip -r -q "../$ID.zip" "$ID")
+          # 2. For the Marketplace: same layout as the official theme template (a dist/ folder)
+          zip -r -q marketplace.zip dist
+
+      - name: Attach the zip to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$TAG" "$THEME_ID.zip" --clobber
+
+      - name: Upload to the LiquidBounce Marketplace
+        if: ${{ !github.event.release.prerelease }}
+        env:
+          API_TOKEN: ${{ secrets.API_TOKEN }}
+          VERSION: ${{ github.event.release.tag_name }}
+          CHANGELOG: ${{ github.event.release.body }}
+          SOURCE_RELEASE_URL: ${{ github.event.release.html_url }}
+        run: |
+          set -euo pipefail
+          if [ -z "${API_TOKEN:-}" ]; then
+            echo "::warning::No API_TOKEN secret is set, so nothing was uploaded to the Marketplace. The GitHub release itself is done."
+            exit 0
+          fi
+          SOURCE_COMMIT="$(git rev-parse HEAD)"
+          # --form-string: -F would read a changelog starting with @ as a file path
+          curl --fail-with-body -X POST \
+            "https://api.liquidbounce.net/marketplace/items/$MARKETPLACE_ITEM_ID/revisions" \
+            -H "Authorization: Bearer $API_TOKEN" \
+            -F "file=@marketplace.zip" \
+            --form-string "version=$VERSION" \
+            --form-string "changelog=$CHANGELOG" \
+            --form-string "sourceRepository=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" \
+            --form-string "sourceRef=$GITHUB_REF" \
+            --form-string "sourceCommit=$SOURCE_COMMIT" \
+            --form-string "sourceReleaseTag=$VERSION" \
+            --form-string "sourceReleaseUrl=$SOURCE_RELEASE_URL" \
+            --form-string "sourceBuildUrl=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
