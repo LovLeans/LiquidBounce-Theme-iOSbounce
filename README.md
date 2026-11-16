@@ -1,7 +1,10 @@
 # iOSbounce
 
-An iOS-style theme for the [LiquidBounce](https://github.com/CCBlueX/LiquidBounce) client, built with [Svelte](https://svelte.dev/).
-It is a fork of CCBlueX's [LiquidBounce-Theme](https://github.com/CCBlueX/LiquidBounce-Theme), the default theme.
+<p align="center">
+  <img src="screenshots/main-menu.png" width="32%">
+  <img src="screenshots/wallpaper-editor.png" width="32%">
+  <img src="screenshots/hud.png" width="32%">
+</p>
 
 ## Download
 
