@@ -1,25 +1,34 @@
+<!-- Add Account > Microsoft > Credentials: e-mail and password. -->
 <script lang="ts">
-    import ButtonSetting from "../../../common/setting/ButtonSetting.svelte";
-    import Tab from "../../../common/modal/Tab.svelte";
-    import IconTextInput from "../../../common/setting/IconTextInput.svelte";
+    import IosPane from "../../../ios/IosPane.svelte";
+    import IosField from "../../../ios/IosField.svelte";
+    import IosButton from "../../../ios/IosButton.svelte";
     import {addMicrosoftAccountCredentials} from "../../../../../integration/rest";
 
-    let email = "";
-    let password = "";
-    let loading = false;
-    $: disabled = email.length === 0 || password.length === 0;
+    interface Props {
+        busy: boolean;
+        run: (job: () => Promise<unknown>, watchdogMs?: number) => void;
+    }
 
-    async function addAccount() {
-        if (disabled) {
-            return;
+    let {busy, run}: Props = $props();
+
+    let email = $state("");
+    let password = $state("");
+
+    const disabled = $derived(busy || email.trim().length === 0 || password.length === 0);
+
+    function add() {
+        if (!disabled) {
+            run(() => addMicrosoftAccountCredentials(email.trim(), password));
         }
-        loading = true;
-        await addMicrosoftAccountCredentials(email, password);
     }
 </script>
 
-<Tab>
-    <IconTextInput title="E-Mail" icon="user" bind:value={email}></IconTextInput>
-    <IconTextInput title="Password" icon="lock" type="password" bind:value={password}></IconTextInput>
-    <ButtonSetting {disabled} title="Link Account" on:click={addAccount} listenForEnter={true} inset={true} {loading}/>
-</Tab>
+<IosPane>
+    <IosField label="E-Mail" placeholder="name@example.com" bind:value={email} onenter={add}/>
+    <IosField label="Password" type="password" placeholder="Password" bind:value={password} onenter={add}/>
+
+    {#snippet actions()}
+        <IosButton variant="primary" {disabled} onclick={add}>{busy ? "Linking…" : "Link Account"}</IosButton>
+    {/snippet}
+</IosPane>

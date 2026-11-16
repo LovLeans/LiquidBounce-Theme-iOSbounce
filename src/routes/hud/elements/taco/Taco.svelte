@@ -1,12 +1,16 @@
 <script lang="ts">
+    import {onDestroy} from "svelte";
+
     let left = -100;
-    setInterval(() => {
+    // was never cleared: every Taco that was ever mounted kept ticking (and re-rendering a destroyed component) for good
+    const timer = setInterval(() => {
         left += 100;
 
         if (left > window.innerWidth + 100) {
             left = -100;
         }
     }, 500);
+    onDestroy(() => clearInterval(timer));
 </script>
 
 <div class="taco">

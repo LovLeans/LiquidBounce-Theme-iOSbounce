@@ -1,0 +1,54 @@
+// The iOS glass of the HUD (tokens: colors.scss, "HUD: iOS glass").
+//
+// The glass is built from layers:
+//   1. a translucent fill                 (the `$tint`, one of the --*-background-color tokens: the base colour at 50 % over transparent. Its ALPHA
+//                                          is what makes the client blur the game behind it, see colors.scss "HUD: iOS glass")
+//   2. one soft drop shadow, so it lifts off the game
+//   3. a page-side backdrop effect          (--hud-frost, `none` by default: the page cannot see the game, see below)
+//
+// The glass is FLAT on purpose: no gradient, no sheen, no inner glow. There is no border of any kind (no hairline ring, no top / bottom edge lines) and no painted imitation of frosting (no milky veil, no grain).
+// The game behind the glass is blurred by the CLIENT (HUD blur), by the ALPHA of the fill: see colors.scss "HUD: iOS glass". A `backdrop-filter`
+// (--hud-frost) only sees what the HUD page itself paints behind the glass (other HUD elements, the HUD editor's backdrop), so it is off by default.
+//
+// The blur alone, for a surface that is not built with `hud-glass` (the tint behind the closed captions, the item name above the hotbar).
+// Not on an element that has an ancestor with `opacity < 1` / `filter` / `mask` between it and what it should blur: that ancestor becomes the
+// backdrop root and the blur then only sees what is inside it. (The element's OWN opacity / filter / transform, which the motions in
+// motion.ts animate, are fine: they fade and blur the glass along with the rest.)
+@mixin hud-frost($filter: var(--hud-frost)) {
+  -webkit-backdrop-filter: $filter;
+  backdrop-filter: $filter;
+}
+
+// `$squircle`: iOS corners are continuous (not circular arcs). `corner-shape: squircle` gives that where the browser has it (Chromium
+// 139+) and is ignored elsewhere, where the corners are plain circular ones. Capsules (radius = half the height) stay circular on purpose.
+@mixin hud-glass(
+  $radius: var(--hud-r-card),
+  $tint: var(--hud-glass),
+  $shadow: var(--hud-shadow),
+  $squircle: true
+) {
+  border-radius: $radius;
+  background: $tint;
+  box-shadow: $shadow;
+
+  @include hud-frost;
+
+  @if $squircle {
+    @supports (corner-shape: squircle) {
+      corner-shape: squircle;
+    }
+  }
+}
+
+// The same stack, for a layer that sits behind an element and reaches out past it (the dock round the hotbar slots): it must not take
+// part in the layout, so the owner stays exactly the size it was.
+@mixin hud-glass-halo($reach: 6px, $radius: 20px, $tint: var(--hud-glass), $shadow: var(--hud-shadow), $squircle: true) {
+  &::before {
+    content: "";
+    position: absolute;
+    inset: -#{$reach};
+    z-index: -1;
+    pointer-events: none;
+    @include hud-glass($radius, $tint, $shadow, $squircle);
+  }
+}

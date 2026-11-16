@@ -1,28 +1,34 @@
+<!-- Add Account > TheAltening: an account from an API token. -->
 <script lang="ts">
-    import Tab from "../../common/modal/Tab.svelte";
-    import IconTextInput from "../../common/setting/IconTextInput.svelte";
-    import ButtonSetting from "../../common/setting/ButtonSetting.svelte";
-    import {addAlteningAccount, openLink} from "../../../../integration/rest";
+    import IosPane from "../../ios/IosPane.svelte";
+    import IosField from "../../ios/IosField.svelte";
+    import IosButton from "../../ios/IosButton.svelte";
+    import {addAlteningAccount, browse} from "../../../../integration/rest";
 
-    let token = "";
-    let loading = false;
-    $: disabled = validateToken(token);
-
-    function validateToken(token: string) {
-        return token.length === 0;
+    interface Props {
+        busy: boolean;
+        run: (job: () => Promise<unknown>, watchdogMs?: number) => void;
     }
 
-    async function addAccount() {
-        if (disabled) {
-            return;
+    let {busy, run}: Props = $props();
+
+    let token = $state("");
+
+    const disabled = $derived(busy || token.trim().length === 0);
+
+    function add() {
+        if (!disabled) {
+            run(() => addAlteningAccount(token.trim()));
         }
-        loading = true;
-        await addAlteningAccount(token);
     }
 </script>
 
-<Tab>
-    <IconTextInput icon="user" title="Token" bind:value={token}/>
-    <ButtonSetting {disabled} title="Add Account" on:click={addAccount} listenForEnter={true} inset={true} {loading}/>
-    <ButtonSetting title="Get Account Token" on:click={() => openLink("THE_ALTENING")} secondary={true}/>
-</Tab>
+<IosPane>
+    <IosField label="Token" placeholder="Account token" bind:value={token} onenter={add}/>
+    <p class="hint">Paste a token from thealtening.com to add its account.</p>
+
+    {#snippet actions()}
+        <IosButton variant="primary" {disabled} onclick={add}>{busy ? "Adding…" : "Add Account"}</IosButton>
+        <IosButton onclick={() => browse("THE_ALTENING")}>Get Account Token</IosButton>
+    {/snippet}
+</IosPane>

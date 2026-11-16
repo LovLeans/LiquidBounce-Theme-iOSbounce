@@ -1,20 +1,27 @@
 <script lang="ts">
     import {createEventDispatcher} from "svelte";
+    import Toggle from "../../../../components/Toggle.svelte";
 
     export let value: boolean;
     export let title: string;
 
     const dispatch = createEventDispatcher();
+
+    // a tap on the title flips it too (the old <label> did that for the checkbox); the switch reports its own changes
+    const flip = () => {
+        value = !value;
+        dispatch("change");
+    };
 </script>
 
-<label class="switch-setting">
+<div class="switch-setting">
     <span class="switch">
-        <input type="checkbox" bind:checked={value} on:change={() => dispatch("change")}/>
-        <span class="slider"></span>
+        <Toggle checked={value} size={46} label={title} onchange={(v) => { value = v; dispatch("change"); }}/>
     </span>
 
-    <span class="title">{title}</span>
-</label>
+    <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+    <span class="title" onclick={flip}>{title}</span>
+</div>
 
 <style lang="scss">
 
@@ -22,6 +29,9 @@
     display: flex;
     align-items: center;
     cursor: pointer;
+    // the shared spring switch takes its colours from these
+    --tg-on: var(--menu-switch-track-active-color);
+    --tg-off: var(--menu-switch-track-color);
   }
 
   .title {
@@ -31,49 +41,9 @@
     font-weight: 500;
   }
 
-  .slider {
-    position: absolute;
-    top: 2px;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: var(--menu-switch-track-color);
-    transition: ease 0.4s;
-    height: 14px;
-    border-radius: 10px;
-
-    &::before {
-      position: absolute;
-      content: "";
-      height: 21px;
-      width: 21px;
-      top: -4px;
-      left: -10px;
-      background-color: var(--menu-switch-thumb-color);
-      transition: ease 0.4s;
-      border-radius: 50%;
-    }
-  }
-
   .switch {
-    position: relative;
     display: flex;
-    width: 28px;
-    height: 18px;
     align-items: center;
     margin: 0 10px;
-
-    input {
-      display: none;
-    }
-
-    input:checked + .slider {
-      background-color: var(--menu-switch-track-active-color);
-    }
-
-    input:checked + .slider:before {
-      transform: translateX(27px);
-      background-color: var(--menu-switch-thumb-active-color);
-    }
   }
 </style>

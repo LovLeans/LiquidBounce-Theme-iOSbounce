@@ -3,7 +3,7 @@
     import {onMount} from "svelte";
     import {getMinecraftKeybinds} from "../../../../integration/rest";
     import type {MinecraftKeybind} from "../../../../integration/types";
-    import {listen} from "../../../../integration/ws";
+    import {listenSticky} from "../../../../integration/ws";
 
     let keyForward: MinecraftKeybind | undefined;
     let keyBack: MinecraftKeybind | undefined;
@@ -11,8 +11,22 @@
     let keyRight: MinecraftKeybind | undefined;
     let keyJump: MinecraftKeybind | undefined;
 
+    // Only the newest read may write: keybindChange can come in quick succession and a slow older answer used to win.
+    let keybindsSequence = 0;
+
     async function updateKeybinds() {
-        const keybinds = await getMinecraftKeybinds();
+        const sequence = ++keybindsSequence;
+        let keybinds: MinecraftKeybind[];
+        try {
+            keybinds = await getMinecraftKeybinds();
+        } catch (e) {
+            console.warn("[Keystrokes] could not read the keybinds", e);
+            return;
+        }
+
+        if (sequence !== keybindsSequence) {
+            return;
+        }
 
         keyForward = keybinds.find(k => k.bindName === "key.forward");
         keyBack = keybinds.find(k => k.bindName === "key.back");
@@ -23,7 +37,7 @@
 
     onMount(updateKeybinds);
 
-    listen("keybindChange", updateKeybinds)
+    listenSticky("keybindChange", updateKeybinds)
 </script>
 
 <div class="keystrokes">

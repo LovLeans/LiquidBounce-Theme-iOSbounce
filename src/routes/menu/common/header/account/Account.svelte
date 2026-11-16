@@ -19,7 +19,6 @@
     import RippleLoader from "../../RippleLoader.svelte";
     import {isLoggingIn} from "../../../altmanager/altmanager_store";
     import {isAnniversary} from "../../../../../util/utils";
-    import {escapeLayer} from "../../../../../integration/escape";
 
     let username = "";
     let service = "";
@@ -86,12 +85,6 @@
             searchQuery = "";
         }
     }
-
-    const layer = escapeLayer(() => {
-        expanded = false;
-        searchQuery = "";
-    });
-    $: layer.setOpen(expanded);
 
     async function login(account: Account) {
         notification.set({

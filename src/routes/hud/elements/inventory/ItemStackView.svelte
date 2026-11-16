@@ -56,29 +56,44 @@
   .item-icon {
     width: 100%;
     height: 100%;
+    image-rendering: pixelated;
   }
 
+  // durability: a thin capsule under the item
   .durability-bar {
     position: absolute;
-    bottom: 0;
-    left: 10%;
-    width: 80%;
-    height: 2px;
-    background-color: var(--item-damage-background-color);
+    bottom: -1px;
+    left: 12%;
+    width: 76%;
+    height: 3px;
+    border-radius: 1.5px;
+    background: var(--item-damage-background-color);
+    overflow: hidden;
   }
 
   .durability {
     height: 100%;
+    border-radius: 1.5px;
     transition: width 150ms;
   }
 
+  // the stack size is a small badge on the corner, like the badge on an iOS app icon
   .count {
     position: absolute;
-    bottom: 0;
-    right: 0;
-    font-size: 14px;
-    font-weight: bold;
-    text-shadow: 1px 1px var(--item-count-shadow-color); // This is inconsistent with other UI elements but it looks better so I will let it pass ~Senk Ju
-    font-family: monospace;
+    bottom: -3px;
+    right: -3px;
+    min-width: 15px;
+    height: 15px;
+    padding: 0 4px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--item-count-background-color);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, .35);
+    font-size: 10px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
   }
 </style>

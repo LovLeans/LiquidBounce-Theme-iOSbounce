@@ -1,8 +1,9 @@
 <script lang="ts">
+    import {onDestroy} from "svelte";
     import type {ClientPlayerDataEvent} from "../../../integration/events";
     import type {PlayerData} from "../../../integration/types";
     import {intToRgba, rgbaToHex} from "../../../integration/util";
-    import {listen} from "../../../integration/ws";
+    import {listenSticky} from "../../../integration/ws";
     import type {HudTextSettings} from "../components";
 
     let playerData: PlayerData | null = null;
@@ -18,12 +19,36 @@
 
     let lastUpdate = Date.now();
 
-    listen("clientPlayerData", (event: ClientPlayerDataEvent) => {
-        if (Date.now() - lastUpdate < UPDATE_TIMEOUT) return;
-        lastUpdate = Date.now();
+    // Throttled to one render per UPDATE_TIMEOUT, but the newest value is never thrown away: events inside the window used to be dropped,
+    // so after two quick changes (a hit right after a heal) the text kept the older value until the next event. The newest one is now
+    // applied when the window ends.
+    let pending: PlayerData | null = null;
+    let pendingTimer: ReturnType<typeof setTimeout> | undefined;
 
-        playerData = event.playerData;
+    listenSticky("clientPlayerData", (event: ClientPlayerDataEvent) => {
+        const wait = UPDATE_TIMEOUT - (Date.now() - lastUpdate);
+
+        if (wait <= 0) {
+            clearTimeout(pendingTimer);
+            pendingTimer = undefined;
+            pending = null;
+            lastUpdate = Date.now();
+            playerData = event.playerData;
+            return;
+        }
+
+        pending = event.playerData;
+        pendingTimer ??= setTimeout(() => {
+            pendingTimer = undefined;
+            if (pending) {
+                lastUpdate = Date.now();
+                playerData = pending;
+                pending = null;
+            }
+        }, wait);
     });
+
+    onDestroy(() => clearTimeout(pendingTimer));
 
     function processText(text: string, playerData: PlayerData | null): string {
         if (!text || !playerData) {

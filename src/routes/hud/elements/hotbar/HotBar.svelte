@@ -1,10 +1,12 @@
 <script lang="ts">
     import Status from "./Status.svelte";
-    import {listen} from "../../../../integration/ws";
+    import {listenSticky} from "../../../../integration/ws";
     import type {PlayerData, TextComponent as TTExtComponent} from "../../../../integration/types";
     import {onMount} from "svelte";
     import {getPlayerData} from "../../../../integration/rest";
     import {fade} from "svelte/transition";
+    import {cubicOut} from "svelte/easing";
+    import {selector} from "./selector";
     import TextComponent from "../../../menu/common/TextComponent.svelte";
     import type {ClientPlayerDataEvent, OverlayMessageEvent} from "../../../../integration/events";
 
@@ -44,11 +46,11 @@
         }
     }
 
-    listen("clientPlayerData", (event: ClientPlayerDataEvent) => {
+    listenSticky("clientPlayerData", (event: ClientPlayerDataEvent) => {
         updatePlayerData(event.playerData);
     });
 
-    listen("overlayMessage", (event: OverlayMessageEvent) => {
+    listenSticky("overlayMessage", (event: OverlayMessageEvent) => {
         overlayMessage = event;
         if (overlayMessageTimeout !== null) {
             clearTimeout(overlayMessageTimeout);
@@ -58,22 +60,30 @@
         }, 3000)
     });
 
+    // The first read must not replace data the client already pushed while the request was out (older health / slot would show again).
     onMount(async () => {
-        updatePlayerData(await getPlayerData());
+        try {
+            const initial = await getPlayerData();
+            if (playerData === null) {
+                updatePlayerData(initial);
+            }
+        } catch (e) {
+            console.warn("[HotBar] could not read the player data, waiting for the client to push it", e);
+        }
     });
 </script>
 
 {#if playerData && playerData.gameMode !== "spectator"}
     <div class="hotbar">
         {#if overlayMessage !== null}
-            <div class="overlay-message" out:fade={{duration: 200}}
+            <div class="overlay-message" in:fade={{duration: 220, easing: cubicOut}} out:fade={{duration: 260}}
                  style="max-width: {slotsElement?.offsetWidth ?? 0}px">
-                <TextComponent fontSize={14} textComponent={overlayMessage.text} allowPreformatting={true} />
+                <TextComponent fontSize={13} textComponent={overlayMessage.text} allowPreformatting={true} preFormattingMonospace={false} />
             </div>
         {/if}
         {#if showItemStackName && itemStackName !== null}
-            <div class="item-name" out:fade={{duration: 200}}>
-                <TextComponent fontSize={14} textComponent={itemStackName}/>
+            <div class="item-name" in:fade={{duration: 220, easing: cubicOut}} out:fade={{duration: 260}}>
+                <TextComponent fontSize={13} textComponent={itemStackName}/>
             </div>
         {/if}
         <div class="status">
@@ -85,7 +95,6 @@
                             value={playerData.armor}
                             color="var(--hotbar-armor-color)"
                             alignRight={false}
-                            icon="shield"
                     />
                 {:else}
                     <div></div>
@@ -122,14 +131,12 @@
                             value={playerData.health}
                             color="var(--hotbar-health-color)"
                             alignRight={false}
-                            icon="heart"
                     />
                     <Status
                             max={20}
                             value={playerData.food}
                             color="var(--hotbar-hunger-color)"
                             alignRight={true}
-                            icon="food"
                     />
                 </div>
             {/if}
@@ -144,8 +151,11 @@
 
         </div>
 
-        <div class="hotbar-elements">
-            <div class="slider" style="left: {currentSlot * 45}px"></div>
+        <!-- The slot row keeps its exact old box (9 slots of 45px = 405 x 45): the game positions the item icons by it. The glass capsule
+             around it is a ::before that reaches out past the box, so it takes no part in the layout. The round selector is a jelly blob
+             that stretches, squashes and wobbles to the selected slot (selector.ts sizes and places the .slider with transform / width /
+             height and writes --q on it). -->
+        <div class="hotbar-elements" use:selector={currentSlot}>
             <div class="slots" bind:this={slotsElement}>
                 <div class="slot"></div>
                 <div class="slot"></div>
@@ -157,6 +167,7 @@
                 <div class="slot"></div>
                 <div class="slot"></div>
             </div>
+            <div class="slider"></div>
         </div>
 
         {#if playerData?.offHandStack.identifier !== "minecraft:air"}
@@ -166,71 +177,101 @@
 {/if}
 
 <style lang="scss">
+  @use "../../glass" as *;
+
+  $slot: 45px;
 
   .pair {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    column-gap: 25px;
+    column-gap: 8px;
   }
 
   .status {
     display: flex;
     flex-direction: column;
-    margin-bottom: 5px;
-    row-gap: 5px;
-    column-gap: 20px;
+    margin-bottom: 12px; // 6px of it is taken by the dock that reaches out above the slots
+    row-gap: 6px;
   }
 
+  // Capsule dock: one long glass pill round the slots (6px of reach, so its end caps are concentric with the first / last slot), with a
+  // round selector with one ring that springs to the selected slot (motion: selector.ts, the pill of the tab bars).
   .hotbar-elements {
-    background-color: var(--hotbar-slot-background-color);
     position: relative;
-    border-radius: 5px;
-    overflow: hidden;
+    isolation: isolate;
 
-    .slider {
-      border: solid 2px var(--hotbar-slot-border-color);
-      height: 45px;
-      width: 45px;
-      position: absolute;
-      border-radius: 5px;
-      /* transition: linear left 0.05s; TODO: Animation is possible but annoying */
-    }
+    @include hud-glass-halo(6px, 999px, var(--hotbar-slot-background-color), var(--hud-shadow), false);
 
     .slots {
       display: flex;
     }
 
     .slot {
-      height: 45px;
-      width: 45px;
+      height: $slot;
+      width: $slot;
+    }
+
+    // The selection is a round bubble with ONE thin ring. selector.ts moves AND sizes it (transform + width + height, not scale()), so the
+    // ring keeps the same thickness while the bubble stretches into a capsule and squashes again. --q (0..1) is "pressed / moving".
+    .slider {
+      --ring: color-mix(in srgb, var(--hotbar-slot-border-color) 78%, white);
+
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: $slot;
+      height: $slot;
+      border-radius: 999px; // a circle at rest, a true capsule when stretched
+      will-change: transform;
+      pointer-events: none;
+      // a flat tint that gets brighter while pressed; the one thin ring, which gets a touch bolder while pressed; a glow only while it moves
+      background: rgba(255, 255, 255, calc(.09 + var(--q, 0) * .2));
+      box-shadow:
+        inset 0 0 0 calc(1.5px + var(--q, 0) * .5px) var(--ring),
+        0 0 calc(var(--q, 0) * 12px) color-mix(in srgb, var(--hotbar-slot-border-color) 40%, transparent);
     }
   }
 
+  // the offhand slot is a round dock of its own, same language as the capsule
   .offhand-slot {
-    height: 45px;
-    width: 45px;
-    border-radius: 5px;
-    background-color: var(--hotbar-slot-background-color);
+    @include hud-glass-halo(6px, 999px, var(--hotbar-slot-background-color), var(--hud-shadow), false);
+
     position: absolute;
     bottom: 0;
     left: -65px;
+    height: $slot;
+    width: $slot;
+    isolation: isolate;
+  }
+
+  // The text above the dock (item name, overlay message): no border, no edge highlight, no shadow, only a soft tint behind the text.
+  // It fades in and out (the transitions in the markup), it does not move or scale.
+  .item-name,
+  .overlay-message {
+    background: var(--hotbar-item-name-background-color);
+    border-radius: 15px;
+    box-shadow: none;
+
+    @include hud-frost;
+    color: var(--hotbar-text-color);
+    margin: 0 auto 12px;
+    width: max-content;
   }
 
   .item-name {
-    color: var(--hotbar-text-color);
-    font-size: 14px;
-    margin: 0 auto 15px;
-    font-weight: 500;
-    background-color: var(--hotbar-item-name-background-color);
-    padding: 5px 8px;
-    border-radius: 5px;
-    width: max-content;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: -.01em;
+    padding: 0 14px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    max-width: 100%;
   }
 
   .overlay-message {
     text-align: center;
-    color: var(--hotbar-text-color);
-    margin-bottom: 15px;
+    padding: 6px 14px;
     overflow: hidden;
   }
 </style>

@@ -1,35 +1,86 @@
 <script lang="ts">
     import ArmorStatus from "./ArmorStatus.svelte";
-    import {listen} from "../../../../integration/ws.js";
+    import {listenSticky} from "../../../../integration/ws.js";
     import type {PlayerData} from "../../../../integration/types";
     import {REST_BASE} from "../../../../integration/host";
-    import {fly} from "svelte/transition";
+    import {cardMotion, CARD_OUT_MS, CARD_SETTLED_MS, CARD_SWAP_MS} from "../../motion";
+    import HudIcon from "../HudIcon.svelte";
+    import SwapText from "../SwapText.svelte";
     import HealthProgress from "./HealthProgress.svelte";
     import type {TargetChangeEvent} from "../../../../integration/events";
 
+    // the last target that was hit: it stays on the card while the card closes
     let target: PlayerData | null = null;
-    let visible = true;
+    // in the DOM: from the moment a target arrives until the exit is over (an exit that waits for a svelte `out:` would pop when a new
+    // target arrives half way through it, so a timer removes the card and `cardMotion` plays the entrance / exit, as in ArrayList.svelte)
+    let mounted = false;
+    // false while the card is closing
+    let open = false;
+    // goes up every time the card is open and another player is hit: the card then pulses (motion.ts `cardMotion`)
+    let pulse = 0;
+    // When the card pulses it dips and blurs first and the new player is put on it at the bottom of the dip (CARD_SWAP_MS later), so for
+    // that moment the next player waits here.
+    let pending: PlayerData | null = null;
+    // when the card last opened (a card that is still growing does not pulse)
+    let openedAt = 0;
 
     let hideTimeout: number;
+    let removeTimeout: number;
+    let swapTimeout: number;
+
+    function applyPending() {
+        if (pending != null) target = pending;
+        pending = null;
+    }
 
     function startHideTimeout() {
         hideTimeout = setTimeout(() => {
-            visible = false;
+            open = false;
+            removeTimeout = setTimeout(() => {
+                mounted = false;
+            }, CARD_OUT_MS + 60);
         }, 1000);
     }
 
-    listen("targetChange", (data: TargetChangeEvent) => {
-        target = data.target;
-        visible = true;
+    listenSticky("targetChange", (data: TargetChangeEvent) => {
         clearTimeout(hideTimeout);
+        clearTimeout(removeTimeout);
+
+        const incoming = data.target;
+
+        if (incoming != null) {
+            const shown = pending ?? target;
+            const switching = shown != null && shown.uuid !== incoming.uuid;
+            const canPulse = mounted && open && performance.now() - openedAt > CARD_SETTLED_MS;
+
+            if (switching && canPulse) {
+                // dip first, the new player appears at the bottom of the dip (a quicker second switch just moves the swap on)
+                pulse++;
+                pending = incoming;
+                clearTimeout(swapTimeout);
+                swapTimeout = setTimeout(applyPending, CARD_SWAP_MS);
+            } else if (pending != null && pending.uuid === incoming.uuid) {
+                // the player that is about to appear was hit again: keep its stats current
+                pending = incoming;
+            } else {
+                clearTimeout(swapTimeout);
+                pending = null;
+                target = incoming;
+            }
+
+            if (!open) openedAt = performance.now();
+            mounted = true;
+            open = true;
+        }
+
         startHideTimeout();
     });
 
     startHideTimeout();
 </script>
 
-{#if visible && target != null}
-    <div class="targethud" transition:fly={{ y: -10, duration: 200 }}>
+{#if mounted && target != null}
+    <div class="targethud" use:cardMotion={{leaving: !open, pulse}}>
         <div class="main-wrapper">
             <div class="avatar">
                 <img src="{REST_BASE}/api/v1/client/resource/skin?uuid={target.uuid}" alt="avatar" />
@@ -37,31 +88,19 @@
     
             <div class="name">{target.username}</div>
             <div class="health-stats">
-                <div class="stat">
-                    <div class="value">{Math.floor(target.actualHealth)}</div>
-                    <img
-                            class="icon"
-                            src="img/hud/targethud/icon-health.svg"
-                            alt="health"
-                    />
+                <div class="stat health">
+                    <HudIcon name="heart" size={12}/>
+                    <div class="value"><SwapText text={String(Math.floor(target.actualHealth))} key={target.uuid} origin="0% 50%"/></div>
                 </div>
                 {#if target.absorption > 0}
-                    <div class="stat">
-                        <div class="value">{Math.floor(target.absorption)}</div>
-                        <img
-                                class="icon"
-                                src="img/hud/targethud/icon-absorption.svg"
-                                alt="absorption"
-                        />
+                    <div class="stat absorption">
+                        <HudIcon name="heart" size={12}/>
+                        <div class="value"><SwapText text={String(Math.floor(target.absorption))} key={target.uuid} origin="0% 50%"/></div>
                     </div>
                 {/if}
-                <div class="stat">
-                    <div class="value">{Math.floor(target.armor)}</div>
-                    <img
-                            class="icon"
-                            src="img/hud/targethud/icon-armor.svg"
-                            alt="armor"
-                    />
+                <div class="stat armor">
+                    <HudIcon name="shield" size={12}/>
+                    <div class="value"><SwapText text={String(Math.floor(target.armor))} key={target.uuid} origin="0% 50%"/></div>
                 </div>
             </div>
             <div class="armor-stats">
@@ -85,11 +124,18 @@
 {/if}
 
 <style lang="scss">
+    @use "../../glass" as *;
 
+    // iOS card: a squircle avatar, the name, three small stats, the armour on the right and a thin health capsule underneath
     .targethud {
-        background-color: var(--targethud-background-color);
-        border-radius: 5px;
+        // 22 = the avatar's radius (10) + the padding round it (12): concentric corners
+        @include hud-glass(22px, var(--targethud-background-color));
+
         overflow: hidden;
+        padding: 12px 14px 12px 12px;
+        display: flex;
+        flex-direction: column;
+        row-gap: 10px;
     }
 
     .main-wrapper {
@@ -97,28 +143,48 @@
         grid-template-areas:
             "a b d"
             "a c d";
-        column-gap: 10px;
-        padding: 10px 15px;
+        grid-template-columns: max-content 1fr max-content;
+        column-gap: 12px;
+        row-gap: 3px;
+        align-items: center;
     }
 
     .name {
         grid-area: b;
         color: var(--targethud-text-color);
-        font-weight: 500;
-        align-self: flex-end;
+        font-size: 15px;
+        font-weight: 600;
+        letter-spacing: -.01em;
+        align-self: end;
+        white-space: nowrap;
     }
 
     .health-stats {
         grid-area: c;
+        align-self: start;
         display: flex;
         column-gap: 10px;
 
         .stat {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            color: var(--hud-red);
+
+            &.absorption {
+                color: var(--hud-yellow);
+            }
+
+            &.armor {
+                color: var(--hotbar-armor-color);
+            }
+
             .value {
                 color: var(--targethud-text-dimmed-color);
-                font-size: 14px;
-                min-width: 18px;
-                display: inline-block;
+                font-size: 12px;
+                font-weight: 500;
+                font-variant-numeric: tabular-nums;
+                min-width: 14px;
             }
         }
     }
@@ -127,28 +193,33 @@
         grid-area: d;
         display: flex;
         align-items: center;
-        column-gap: 10px;
-        padding-left: 5px;
+        column-gap: 8px;
+        padding-left: 4px;
     }
 
     .avatar {
         grid-area: a;
-        height: 50px;
-        width: 50px;
+        height: 46px;
+        width: 46px;
         position: relative;
         image-rendering: pixelated;
         background-image: url("/img/steve.png");
         background-repeat: no-repeat;
         background-size: cover;
-        border-radius: 5px;
+        border-radius: 10px;
         overflow: hidden;
+        box-shadow: 0 1px 1px rgba(0, 0, 0, .10), 0 3px 8px -2px rgba(0, 0, 0, .34);
 
-        // Face is the 8x8 square at (8, 8) of a 64-wide skin, at whatever resolution the texture has.
+        @supports (corner-shape: squircle) {
+            corner-shape: squircle;
+        }
+
         img {
             position: absolute;
-            width: 800%;
-            left: -100%;
-            top: -100%;
+            // the face is cut out of the skin by scaling and moving the whole picture (it was tuned for a 50px box, hence the 46/50)
+            scale: 5.75;
+            left: 106px;
+            top: 106px;
         }
     }
 </style>

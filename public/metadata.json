@@ -1,14 +1,10 @@
 {
-  "id": "liquidbounce",
-  "name": "LiquidBounce",
+  "id": "iosbounce",
+  "name": "iOSbounce",
   "version": "0.1.0",
-  "authors": ["CCBlueX"],
-  "splash": {
-    "animation": "splash/animation.json",
-    "background": "#181a1b",
-    "text": "#ffffff",
-    "accent": "#4677ff"
-  },
+  "authors": [
+    "LovLean"
+  ],
   "colors": {
     "Accent": "#4677ff",
     "Tint": "#000000"
@@ -27,7 +23,6 @@
     "hud",
     "inventory",
     "container",
-    "connecting",
     "disconnected",
     "browser"
   ],
@@ -64,11 +59,13 @@
     "Inter-SemiBold.ttf",
     "Inter-Thin.ttf"
   ],
-  "nativeFont": "Inter Medium",
   "backgrounds": [
     {
       "name": "background",
-      "types": ["frag", "png"]
+      "types": [
+        "frag",
+        "png"
+      ]
     }
   ],
   "values": []

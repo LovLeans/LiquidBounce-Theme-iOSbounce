@@ -1,5 +1,5 @@
 <script lang="ts">
-    import {listen} from "../../../integration/ws";
+    import {listenSticky} from "../../../integration/ws";
     import type {PlayerData, Scoreboard, TextComponent as TTextComponent} from "../../../integration/types";
     import TextComponent from "../../menu/common/TextComponent.svelte";
     import type {ClientPlayerDataEvent} from "../../../integration/events";
@@ -33,7 +33,7 @@
         };
     }
 
-    listen("clientPlayerData", (e: ClientPlayerDataEvent) => {
+    listenSticky("clientPlayerData", (e: ClientPlayerDataEvent) => {
         const playerData: PlayerData = e.playerData;
         scoreboard = playerData.scoreboard;
     });
@@ -43,17 +43,17 @@
     <div class="scoreboard">
         {#if processedScoreboard.header && cSettings.show.includes('Header')}
             <div class="header">
-                <TextComponent fontSize={14} allowPreformatting={true} textComponent={processedScoreboard.header}/>
+                <TextComponent fontSize={13} allowPreformatting={true} preFormattingMonospace={false} textComponent={processedScoreboard.header}/>
             </div>
         {/if}
         <div class="entries">
             {#each processedScoreboard.entries as {name, score}}
                 <div class="row">
                     {#if cSettings.show.includes('Name')}
-                        <TextComponent fontSize={14} allowPreformatting={true} textComponent={name}/>
+                        <TextComponent fontSize={13} allowPreformatting={true} preFormattingMonospace={false} textComponent={name}/>
                     {/if}
                     {#if cSettings.show.includes('Score')}
-                        <TextComponent fontSize={14} allowPreformatting={true} textComponent={score}/>
+                        <TextComponent fontSize={13} allowPreformatting={true} preFormattingMonospace={false} textComponent={score}/>
                     {/if}
                 </div>
             {/each}
@@ -62,29 +62,38 @@
 {/if}
 
 <style lang="scss">
+  @use "../glass" as *;
 
+  // one glass card (the old header / body were two differently tinted boxes); the header is separated by a hairline
   .scoreboard {
+    @include hud-glass(var(--hud-r-card), var(--scoreboard-background-color));
+
     width: max-content;
-    border-radius: 5px;
     overflow: hidden;
-    font-size: 14px;
-  }
-
-  .entries {
-    background-color: var(--scoreboard-body-background-color);
-    padding: 10px;
-  }
-
-  .row {
-    display: flex;
-    column-gap: 15px;
-    justify-content: space-between;
-    min-height: 14px; // Text component height
+    font-size: 13px;
   }
 
   .header {
     text-align: center;
-    background-color: var(--scoreboard-header-background-color);
-    padding: 7px 10px;
+    font-weight: 600;
+    background: var(--scoreboard-header-background-color);
+    box-shadow: 0 1px 0 var(--hud-separator);
+    padding: 9px 14px 8px;
+  }
+
+  .entries {
+    padding: 8px 14px 10px;
+    display: flex;
+    flex-direction: column;
+    row-gap: 3px;
+  }
+
+  .row {
+    display: flex;
+    column-gap: 16px;
+    justify-content: space-between;
+    align-items: center;
+    min-height: 16px; // Text component height
+    font-variant-numeric: tabular-nums;
   }
 </style>

@@ -199,91 +199,120 @@
   --menu-account-search-background-color: var(--menu-base-36-color);
   --menu-account-search-border-color: var(--accent-color);
 
-  /* HUD */
-  --tabgui-base-color: var(--surface-color);
-  --tabgui-text-color: var(--text-color);
-  --tabgui-text-dimmed-color: var(--text-dimmed-color);
-  --tabgui-base-36-color: color-mix(in srgb, var(--tabgui-base-color) 36%, transparent);
-  --tabgui-base-50-color: color-mix(in srgb, var(--tabgui-base-color) 50%, transparent);
-  --tabgui-base-68-color: color-mix(in srgb, var(--tabgui-base-color) 68%, transparent);
-  --tabgui-icon-background-color: var(--tabgui-base-68-color);
-  --tabgui-category-background-color: var(--tabgui-base-50-color);
+  /* HUD: iOS glass
+     THE BLUR OF THE GAME IS THE CLIENT'S, NOT THE PAGE'S. The HUD page is drawn into its own transparent layer on top of the game, so a CSS
+     `backdrop-filter` can never see the game. What blurs the game is the client's HUD blur (Render > HUD > Blur): a shader blurs the game behind
+     every HUD pixel whose alpha is above 0.01, by an amount of
+         clamp(alpha / AlphaBlendRange.max, 0.1, 1)          (defaults: Sigma 5, AlphaBlendRange 0.0 .. 0.75)
+     so the blur is only as strong as the glass is OPAQUE. --hud-glass is 50 % alpha: at the default range that is 67 % of the blur; set the client's
+     AlphaBlendRange.max to 0.5 for the full blur at this fill (or lower it further and lower the percentage below to get clearer glass).
+     Shadows and glows count too: anything painted with alpha > 0.01 blurs the game under it (at least 10 %), so the long soft shadows
+     also blur a faint halo round each card. Tighten --hud-shadow if that shows. */
+  --hud-base: #2c2c32;
+  --hud-glass: color-mix(in srgb, var(--hud-base) 50%, transparent);
+  --hud-glass-soft: color-mix(in srgb, var(--hud-base) 36%, transparent);
+  /* A page-side backdrop effect would only see other HUD elements, never the game, so it is off (the liquid-glass refraction that was tried here
+     was removed). To get a blur between overlapping HUD elements / over the HUD editor's backdrop: `blur(8px) saturate(1.45)`. */
+  --hud-frost: none;
+  --hud-fill: rgba(120, 120, 128, .32);
+  --hud-fill-strong: rgba(255, 255, 255, .14);
+  --hud-separator: rgba(255, 255, 255, .09);
+  /* The panels are see-through, and a box-shadow is never drawn under its own box, so the shadow is only ever seen as a halo round the
+     edge. A tight dark shadow there reads as a dirty outline: this is one soft, pulled-in shadow (negative spread) that gathers under the
+     panel and lifts it off the game. */
+  --hud-shadow: 0 10px 28px -10px rgba(0, 0, 0, .34);
+  --hud-shadow-sm: 0 6px 16px -6px rgba(0, 0, 0, .30);
+
+  --hud-tx: var(--text-color);
+  --hud-tx2: rgba(235, 235, 245, .64);
+  --hud-tx3: rgba(235, 235, 245, .36);
+
+  /* corner radii (concentric: a container's radius = its content's radius + its padding) */
+  --hud-r-card: 20px;
+  --hud-r-item: 12px;
+  --hud-r-small: 8px;
+
+  /* iOS system colors (dark) */
+  --hud-red: #ff453a;
+  --hud-orange: #ff9f0a;
+  --hud-yellow: #ffd60a;
+  --hud-green: #30d158;
+  --hud-cyan: #64d2ff;
+  --hud-gray: #8e8e93;
+
+  /* iOS springs as CSS easings: --hud-spring ~ .snappy (response .42, damping .84, settles in ~.56 s, 0.8 % overshoot),
+     --hud-smooth ~ .smooth (critically damped, never overshoots), --hud-bouncy (response .5, damping .7, 4.6 % overshoot) */
+  --hud-spring: linear(0, 0.0236, 0.0829, 0.1637, 0.2555, 0.3507, 0.444, 0.5318, 0.612, 0.6836, 0.7461, 0.7997, 0.8449, 0.8823, 0.9129, 0.9375, 0.957, 0.972, 0.9835, 0.992, 0.9981, 1.0023, 1.005, 1.0067, 1.0075, 1.0077, 1.0075, 1.0071, 1.0064, 1.0057, 1.005, 1.0043, 1.0036, 1.003, 1.0024, 1.0019, 1);
+  --hud-smooth: linear(0, 0.0252, 0.0862, 0.1664, 0.2546, 0.3436, 0.4289, 0.508, 0.5796, 0.6432, 0.6989, 0.7473, 0.7888, 0.8241, 0.8541, 0.8793, 0.9004, 0.918, 0.9327, 0.9449, 0.9549, 0.9632, 0.97, 0.9756, 0.9801, 0.9839, 0.9869, 0.9894, 0.9914, 0.9931, 0.9944, 0.9955, 0.9964, 0.9971, 0.9976, 0.9981, 1);
+  --hud-bouncy: linear(0, 0.0323, 0.1131, 0.2222, 0.3441, 0.4674, 0.584, 0.6891, 0.7799, 0.8554, 0.9159, 0.9623, 0.9964, 1.02, 1.0349, 1.043, 1.0459, 1.0451, 1.0418, 1.0371, 1.0315, 1.0258, 1.0204, 1.0154, 1.0111, 1.0074, 1.0045, 1.0022, 1.0005, 0.9993, 0.9985, 0.9981, 0.9979, 0.9979, 0.998, 0.9982, 1);
+
+  /* Per element (each one can still be themed on its own; the defaults are the shared tokens above) */
+  --tabgui-text-color: var(--hud-tx);
+  --tabgui-text-dimmed-color: var(--hud-tx2);
+  --tabgui-background-color: var(--hud-glass);
   --tabgui-category-active-background-color: var(--accent-color);
-  --tabgui-module-selected-background-color: var(--tabgui-base-36-color);
-  --tabgui-modules-background-color: var(--tabgui-base-50-color);
+  --tabgui-module-selected-background-color: var(--hud-fill-strong);
 
-  --arraylist-base-color: var(--surface-color);
-  --arraylist-text-color: var(--text-color);
-  --arraylist-tag-color: #aaaaaa;
-  --arraylist-background-color: color-mix(in srgb, var(--arraylist-base-color) 68%, transparent);
-  --arraylist-border-color: var(--accent-color);
+  --arraylist-text-color: var(--hud-tx);
+  --arraylist-tag-color: var(--hud-tx2);
+  --arraylist-background-color: var(--hud-glass);
+  --arraylist-border-color: var(--accent-color); /* the dot on the outer edge of each row */
 
-  --targethud-base-color: var(--surface-color);
-  --targethud-text-color: var(--text-color);
-  --targethud-text-dimmed-color: var(--text-dimmed-color);
-  --targethud-base-30-color: color-mix(in srgb, var(--targethud-base-color) 30%, transparent);
-  --targethud-base-68-color: color-mix(in srgb, var(--targethud-base-color) 68%, transparent);
-  --targethud-background-color: var(--targethud-base-68-color);
-  --targethud-armor-point-background-color: var(--targethud-base-30-color);
+  --targethud-text-color: var(--hud-tx);
+  --targethud-text-dimmed-color: var(--hud-tx2);
+  --targethud-background-color: var(--hud-glass);
+  --targethud-armor-point-background-color: var(--hud-fill);
   --targethud-armor-point-active-color: var(--accent-color);
-  --targethud-health-progress-color: var(--hotbar-health-color);
+  --targethud-health-progress-color: var(--hud-red);
 
-  --blockcounter-base-color: var(--surface-color);
-  --blockcounter-background-color: color-mix(in srgb, var(--blockcounter-base-color) 68%, transparent);
+  --blockcounter-background-color: var(--hud-glass);
 
-  --hotbar-base-color: var(--surface-color);
-  --hotbar-text-color: var(--text-color);
-  --hotbar-base-68-color: color-mix(in srgb, var(--hotbar-base-color) 68%, transparent);
-  --hotbar-armor-color: #49ead6;
-  --hotbar-air-color: #aac1e3;
-  --hotbar-absorption-color: #d4af37;
-  --hotbar-experience-color: #88c657;
-  --hotbar-health-color: #fc4130;
-  --hotbar-hunger-color: #b88458;
-  --hotbar-status-background-color: var(--hotbar-base-68-color);
-  --hotbar-slot-background-color: var(--hotbar-base-68-color);
+  --hotbar-text-color: var(--hud-tx);
+  --hotbar-armor-color: #bfc9d9;
+  --hotbar-air-color: var(--hud-cyan);
+  --hotbar-absorption-color: var(--hud-yellow);
+  --hotbar-experience-color: var(--hud-green);
+  --hotbar-health-color: var(--hud-red);
+  --hotbar-hunger-color: var(--hud-orange);
+  --hotbar-status-background-color: var(--hud-glass);
+  --hotbar-slot-background-color: var(--hud-glass);
   --hotbar-slot-border-color: var(--accent-color);
-  --hotbar-item-name-background-color: var(--hotbar-base-68-color);
+  --hotbar-item-name-background-color: var(--hud-glass);
 
-  --scoreboard-base-color: var(--surface-color);
-  --scoreboard-base-50-color: color-mix(in srgb, var(--scoreboard-base-color) 50%, transparent);
-  --scoreboard-base-68-color: color-mix(in srgb, var(--scoreboard-base-color) 68%, transparent);
-  --scoreboard-header-background-color: var(--scoreboard-base-68-color);
-  --scoreboard-body-background-color: var(--scoreboard-base-50-color);
+  --scoreboard-background-color: var(--hud-glass);
+  --scoreboard-header-background-color: transparent;
 
-  --keystrokes-base-color: var(--surface-color);
-  --keystrokes-text-color: var(--text-color);
-  --keystrokes-background-color: color-mix(in srgb, var(--keystrokes-base-color) 68%, transparent);
+  --keystrokes-text-color: var(--hud-tx);
+  --keystrokes-background-color: var(--hud-glass);
   --keystrokes-active-color: var(--accent-color);
 
-  --item-damage-base-color: var(--surface-color);
-  --item-damage-background-color: color-mix(in srgb, var(--item-damage-base-color) 68%, transparent);
-  --item-enchant-glow-start-color: rgba(112, 48, 160, 0.8);
+  --item-damage-background-color: var(--hud-fill);
+  --item-enchant-glow-start-color: rgba(191, 90, 242, .8);
   --item-enchant-glow-end-color: rgba(255, 105, 180, 0);
-  --item-count-shadow-color: #000000;
-  --inventory-background-color: color-mix(in srgb, var(--surface-color) 50%, transparent);
+  --item-count-background-color: rgba(20, 20, 22, .78);
+  --inventory-background-color: var(--hud-glass);
 
-  --keybinds-base-color: var(--surface-color);
-  --keybinds-text-color: var(--text-color);
-  --keybinds-enabled-color: var(--success-color);
-  --keybinds-base-68-color: color-mix(in srgb, var(--keybinds-base-color) 68%, transparent);
-  --keybinds-text-muted-color: color-mix(in srgb, var(--keybinds-text-color) 65%, transparent);
-  --keybinds-background-color: var(--keybinds-base-68-color);
-  --keybinds-header-background-color: var(--scoreboard-base-50-color);
+  --keybinds-text-color: var(--hud-tx);
+  --keybinds-enabled-color: var(--accent-color);
+  --keybinds-text-muted-color: var(--hud-tx2);
+  --keybinds-background-color: var(--hud-glass);
+  --keybinds-header-background-color: transparent;
   --keybinds-accent-color: var(--accent-color);
 
-  --effects-amplifier-color: var(--error-color);
-  --effects-name-color: var(--text-color);
-  --effects-background-color: color-mix(in srgb, var(--surface-color) 50%, transparent);
-  --effects-duration-color: var(--text-color);
+  --effects-amplifier-color: var(--hud-orange);
+  --effects-name-color: var(--hud-tx);
+  --effects-background-color: var(--hud-glass);
+  --effects-duration-color: var(--hud-tx2);
 
-  --notification-background-color: color-mix(in srgb, var(--surface-color) 68%, transparent);
-  --notification-success-color: var(--success-color);
-  --notification-error-color: var(--error-color);
+  --notification-background-color: var(--hud-glass);
+  --notification-success-color: var(--hud-green);
+  --notification-enabled-color: var(--accent-color); /* a module that was turned on: its tile and the switch */
+  --notification-error-color: var(--hud-red);
   --notification-info-color: var(--accent-color);
-  --notification-toggle-knob-color: var(--text-color);
-  --notification-title-color: var(--text-color);
-  --notification-message-color: var(--text-dimmed-color);
+  --notification-disabled-color: var(--hud-gray);
+  --notification-toggle-knob-color: #ffffff;
+  --notification-title-color: var(--hud-tx);
+  --notification-message-color: var(--hud-tx2);
 
   /* Special visuals */
   --tooltip-background-color: var(--accent-color);

@@ -1,15 +1,19 @@
 name: Build
+
+# Builds the theme on every push to main and on pull requests. Two ways to get the compiled theme:
+#   1. the run's artifact (Actions tab -> the run -> Artifacts)
+#   2. the "Latest build" release, a fixed link that needs no GitHub login:
+#      https://github.com/<owner>/<repo>/releases/latest/download/<theme id>.zip
+# Both hold a folder named like the theme id (from public/metadata.json), ready to drop into the client's themes folder.
 on:
   push:
     branches:
       - main
+  pull_request:
+  workflow_dispatch:
 
 permissions:
-  contents: write
-
-env:
-  ZIP_NAME: theme            # Name for the distribution archive
-  MARKETPLACE_ITEM_ID: 12345        # Replace with your actual marketplace item ID
+  contents: write   # to update the "latest" release
 
 jobs:
   build:
@@ -17,8 +21,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -27,51 +29,36 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Build project
         run: npm run build
 
-      - name: Create dist archive
-        run: zip -r ${{ env.ZIP_NAME }}.zip dist/
+      - name: Package the theme
+        run: |
+          test -f dist/metadata.json || { echo "::error::dist/metadata.json is missing, the build is incomplete"; exit 1; }
+          ID="$(jq -r .id dist/metadata.json)"
+          mkdir -p pkg
+          cp -r dist "pkg/$ID"
+          (cd pkg && zip -r -q "../$ID.zip" "$ID")
+          echo "THEME_ID=$ID" >> "$GITHUB_ENV"
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.ZIP_NAME }}
-          path: ${{ env.ZIP_NAME }}.zip
+          name: ${{ env.THEME_ID }}-${{ github.sha }}
+          path: pkg
+          if-no-files-found: error
 
-      - name: Generate version tag
-        id: version_tag
+      - name: Update the "latest" release
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          COMMIT_HASH=$(git rev-parse --short HEAD)
-          TAG="build-$COMMIT_HASH-$(date +'%Y%m%d%H%M%S')"
-          echo "version=$TAG" >> $GITHUB_OUTPUT
-
-      # Uncomment the sections below to enable GitHub releases and marketplace publishing
-      #
-      # - name: Create and push Git tag
-      #   run: |
-      #     git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
-      #     git config --local user.name "github-actions[bot]"
-      #     git tag ${{ steps.version_tag.outputs.version }}
-      #     git push origin ${{ steps.version_tag.outputs.version }}
-      #
-      # - name: Upload to GitHub Release
-      #   uses: softprops/action-gh-release@v1
-      #   with:
-      #     files: ${{ env.ZIP_NAME }}.zip
-      #     tag_name: ${{ steps.version_tag.outputs.version }}
-      #     prerelease: true
-      #     name: "Build Release ${{ steps.version_tag.outputs.version }}"
-      #
-      # - name: Upload to LiquidBounce Marketplace
-      #   run: |
-      #     curl -X POST \
-      #       "https://api.liquidbounce.net/api/v3/marketplace/${{ env.MARKETPLACE_ITEM_ID }}/revisions" \
-      #       -H "Authorization: Bearer ${{ secrets.API_TOKEN }}" \
-      #       -F "file=@${{ env.ZIP_NAME }}.zip" \
-      #       -F "version=${{ steps.version_tag.outputs.version }}" \
-      #       -F "changelog=Automated build from commit ${{ github.sha }}" \
-      #       -F "channel=alpha" \
-      #       --fail-with-body
+          SHORT="$(git rev-parse --short HEAD)"
+          gh release delete latest --cleanup-tag --yes || true
+          gh release create latest "$THEME_ID.zip" \
+            --target "$GITHUB_SHA" \
+            --title "Latest build" \
+            --notes "Compiled theme from commit $SHORT. Unzip it into the client's themes folder (open it with \`.client theme browse\`), then run \`.client theme set $THEME_ID\`." \
+            --latest

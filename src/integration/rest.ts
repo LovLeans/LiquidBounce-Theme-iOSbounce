@@ -8,11 +8,9 @@ import type {
     ClientUpdate,
     ClientUser,
     ConfigurableSetting,
-    ConnectionDetails,
     FileSelectDialog,
     FileSelectResult,
     GameWindow,
-    GeneratorResult,
     HitResult,
     HudComponent,
     HudComponentCatalogEntry,
@@ -34,8 +32,15 @@ import type {
 import type {PlayerInventory} from "./events";
 import {isLoggingIn} from "../routes/menu/altmanager/altmanager_store";
 import {replace} from "svelte-spa-router";
+import {generateUsername} from "../util/random_username";
 
 const API_BASE = `${REST_BASE}/api/v1`;
+
+/**
+ * When the page last asked the client to put the player in a game (join a server or world, reconnect). The client closes the
+ * current screen on its own then; App.svelte uses this to tell that close from an Esc.
+ */
+export const gameLeave = {at: -1e9};
 
 export async function getMetadata(): Promise<Metadata> {
     const response = await fetch(`metadata.json`);
@@ -44,11 +49,47 @@ export async function getMetadata(): Promise<Metadata> {
     return data;
 }
 
-export async function getModules(): Promise<Module[]> {
+async function fetchModules(): Promise<Module[]> {
     const response = await fetch(`${API_BASE}/client/modules`);
     const data: [Module] = await response.json();
 
     return data;
+}
+
+// getModules() is called by the ArrayList, KeyBinds and TabGui on EVERY moduleToggle (loading a config toggles a hundred modules in one
+// go: ~300 full requests + JSON parses). Now at most one request is out and one is queued behind it. A caller that arrives while a
+// request is out waits for the queued one (the answer in flight may predate the change that made it ask), and everyone who arrives
+// meanwhile shares that one.
+let modulesInFlight: Promise<Module[]> | null = null;
+let modulesQueued: Promise<Module[]> | null = null;
+
+function startModulesRequest(): Promise<Module[]> {
+    const request = fetchModules();
+    modulesInFlight = request;
+    const release = () => {
+        if (modulesInFlight === request) {
+            modulesInFlight = null;
+        }
+    };
+    request.then(release, release);
+    return request;
+}
+
+/** Each caller gets its own copy of the list: TabGui edits `enabled` on its objects, which must not show up in the others' lists. */
+const copyModules = (list: Module[]): Module[] => Array.isArray(list) ? list.map(m => ({...m})) : list;
+
+export function getModules(): Promise<Module[]> {
+    let shared: Promise<Module[]>;
+    if (modulesInFlight === null) {
+        shared = startModulesRequest();
+    } else {
+        modulesQueued ??= modulesInFlight.then(() => undefined, () => undefined).then(() => {
+            modulesQueued = null;
+            return startModulesRequest();
+        });
+        shared = modulesQueued;
+    }
+    return shared.then(copyModules);
 }
 
 export async function getCategories(): Promise<ModuleCategory[]> {
@@ -74,16 +115,24 @@ export async function getModuleSettings(name: string): Promise<ConfigurableSetti
     return data;
 }
 
+/** A refused request (4xx / 5xx) is a failure: fetch only rejects when the request could not be sent at all. */
+function ensureOk(response: Response, what: string): void {
+    if (!response.ok) {
+        throw new Error(`${what} was refused by the client: HTTP ${response.status}`);
+    }
+}
+
 export async function setModuleSettings(name: string, settings: ConfigurableSetting) {
     const searchParams = new URLSearchParams({name});
 
-    await fetch(`${API_BASE}/client/modules/settings?${searchParams.toString()}`, {
+    const response = await fetch(`${API_BASE}/client/modules/settings?${searchParams.toString()}`, {
         method: "PUT",
         headers: {
             "Content-Type": "application/json"
         },
         body: JSON.stringify(settings)
     });
+    ensureOk(response, `Saving the settings of ${name}`);
 }
 
 export async function getSpooferSettings(): Promise<ConfigurableSetting> {
@@ -121,7 +170,7 @@ export async function setGlobalSettings(settings: ConfigurableSetting) {
 }
 
 export async function setModuleEnabled(name: string, enabled: boolean) {
-    await fetch(`${API_BASE}/client/modules/toggle`, {
+    const response = await fetch(`${API_BASE}/client/modules/toggle`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json"
@@ -131,6 +180,8 @@ export async function setModuleEnabled(name: string, enabled: boolean) {
             enabled
         })
     });
+    // used to pass silently: the GUI showed a module as switched that the client had refused
+    ensureOk(response, `Switching ${name}`);
 }
 
 export async function getPersistentStorageItems(): Promise<PersistentStorageItem[]> {
@@ -230,8 +281,8 @@ export async function getSession(): Promise<Session> {
     return data;
 }
 
-export async function openLink(target: string) {
-    await fetch(`${API_BASE}/client/openLink`, {
+export async function browse(target: string) {
+    await fetch(`${API_BASE}/client/browse`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json"
@@ -272,16 +323,6 @@ export async function deleteScreen() {
     });
 }
 
-export async function keepScreenEscape(name: string, keep: boolean) {
-    await fetch(`${API_BASE}/client/screen/escape`, {
-        method: "PUT",
-        headers: {
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify({name, keep})
-    });
-}
-
 export async function getServers(): Promise<Server[]> {
     const response = await fetch(`${API_BASE}/client/servers`);
     const data: Server[] = await response.json();
@@ -302,6 +343,7 @@ export async function getLanServers(): Promise<Server[]> {
 }
 
 export async function connectToServer(address: string) {
+    gameLeave.at = performance.now();
     await fetch(`${API_BASE}/client/servers/connect`, {
         method: "POST",
         headers: {
@@ -311,46 +353,39 @@ export async function connectToServer(address: string) {
     });
 }
 
-export async function getConnectionDetails(): Promise<ConnectionDetails | null> {
-    const response = await fetch(`${API_BASE}/client/connection`);
-
-    if (response.status !== 200) {
-        return null;
-    }
-
-    const data: ConnectionDetails = await response.json();
-
-    return data;
-}
-
 export async function removeServer(id: number) {
-    await fetch(`${API_BASE}/client/servers/remove`, {
+    const response = await fetch(`${API_BASE}/client/servers/remove`, {
         method: "DELETE",
         headers: {
             "Content-Type": "application/json"
         },
         body: JSON.stringify({id})
     });
+    ensureOk(response, "Removing the server");
 }
 
 export async function addServer(name: string, address: string, resourcePackPolicy: string) {
-    await fetch(`${API_BASE}/client/servers/add`, {
+    const response = await fetch(`${API_BASE}/client/servers/add`, {
         method: "PUT",
         headers: {
             "Content-Type": "application/json"
         },
         body: JSON.stringify({name, address, resourcePackPolicy})
     });
+    // a refused entry (4xx / 5xx) keeps the dialog open instead of closing as if it had been saved
+    ensureOk(response, "Adding the server");
 }
 
 export async function editServer(id: number, name: string, address: string, resourcePackPolicy: string) {
-    await fetch(`${API_BASE}/client/servers/edit`, {
+    const response = await fetch(`${API_BASE}/client/servers/edit`, {
         method: "PUT",
         headers: {
             "Content-Type": "application/json"
         },
         body: JSON.stringify({id, name, address, resourcePackPolicy})
     });
+    // a refused entry (4xx / 5xx) keeps the dialog open instead of closing as if it had been saved
+    ensureOk(response, "Saving the server");
 }
 
 export async function orderServers(order: number[]) {
@@ -395,13 +430,14 @@ export async function restoreSession() {
 }
 
 export async function orderAccounts(order: number[]) {
-    await fetch(`${API_BASE}/client/accounts/order`, {
+    const response = await fetch(`${API_BASE}/client/accounts/order`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json"
         },
         body: JSON.stringify({order})
     });
+    ensureOk(response, "Saving the account order");
 }
 
 
@@ -464,33 +500,25 @@ export async function addMicrosoftAccountCredentials(email: string, password: st
 }
 
 export async function setAccountFavorite(id: number, favorite: boolean) {
-    if (favorite) {
-        await fetch(`${API_BASE}/client/account/favorite`, {
-            method: "PUT",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({id})
-        });
-    } else {
-        await fetch(`${API_BASE}/client/account/favorite`, {
-            method: "DELETE",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({id})
-        });
-    }
+    const response = await fetch(`${API_BASE}/client/account/favorite`, {
+        method: favorite ? "PUT" : "DELETE",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({id})
+    });
+    ensureOk(response, "Changing the account favorite");
 }
 
 export async function removeAccount(id: number) {
-    await fetch(`${API_BASE}/client/account`, {
+    const response = await fetch(`${API_BASE}/client/account`, {
         method: "DELETE",
         headers: {
             "Content-Type": "application/json"
         },
         body: JSON.stringify({id})
     });
+    ensureOk(response, "Removing the account");
 }
 
 export async function loginToAccount(id: number) {
@@ -541,6 +569,7 @@ export async function getWorlds(): Promise<World[]> {
 }
 
 export async function openWorld(name: string) {
+    gameLeave.at = performance.now();
     const response = await fetch(`${API_BASE}/client/worlds/join`, {
         method: "POST",
         headers: {
@@ -568,6 +597,7 @@ export async function removeWorld(name: string) {
         },
         body: JSON.stringify({name})
     });
+    ensureOk(response, "Removing the world");
 }
 
 export async function getProxies(): Promise<Proxy[]> {
@@ -606,23 +636,14 @@ export async function disconnectFromProxy() {
 }
 
 export async function setProxyFavorite(id: number, favorite: boolean) {
-    if (favorite) {
-        await fetch(`${API_BASE}/client/proxies/favorite`, {
-            method: "PUT",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({id})
-        });
-    } else {
-        await fetch(`${API_BASE}/client/proxies/favorite`, {
-            method: "DELETE",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({id})
-        });
-    }
+    const response = await fetch(`${API_BASE}/client/proxies/favorite`, {
+        method: favorite ? "PUT" : "DELETE",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({id})
+    });
+    ensureOk(response, "Changing the proxy favorite");
 }
 
 export async function addProxy(host: string, port: number, username: string, password: string, type: string, forwardAuthentication: boolean, proxyResourcePacks: boolean, proxyDns: boolean) {
@@ -652,13 +673,14 @@ export async function addProxyFromClipboard() {
 }
 
 export async function removeProxy(id: number) {
-    await fetch(`${API_BASE}/client/proxies/remove`, {
+    const response = await fetch(`${API_BASE}/client/proxies/remove`, {
         method: "DELETE",
         headers: {
             "Content-Type": "application/json"
         },
         body: JSON.stringify({id})
     });
+    ensureOk(response, "Removing the proxy");
 }
 
 export async function connectToProxy(id: number) {
@@ -678,14 +700,25 @@ export async function getGameWindow(): Promise<GameWindow> {
     return data;
 }
 
-export async function setHudEditorSelected(selected: boolean): Promise<void> {
-    await fetch(`${API_BASE}/client/hud-editor`, {
-        method: "PUT",
-        headers: {
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify({selected})
+// The client keeps a single "HUD editor selected" flag, so the last request to arrive wins. These calls come from several places
+// (the GUI route resets it when it opens, the HUD editor tab sets it and clears it when it goes away) and are fired without being
+// awaited: when the GUI is reopened on the HUD editor tab they used to overlap, a late `false` could land after the editor's `true`,
+// and the editor came up empty. Sending them one after another, in call order, makes the last call the last to arrive.
+let hudEditorSelectedQueue: Promise<unknown> = Promise.resolve();
+
+export function setHudEditorSelected(selected: boolean): Promise<void> {
+    const request = hudEditorSelectedQueue.then(async () => {
+        await fetch(`${API_BASE}/client/hud-editor`, {
+            method: "PUT",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({selected})
+        });
     });
+    // a failed request must not block the ones after it (the caller still sees the error through the returned promise)
+    hudEditorSelectedQueue = request.catch(() => {});
+    return request;
 }
 
 /**
@@ -720,18 +753,23 @@ export async function addComponent(id: string): Promise<void> {
     });
 
     if (!response.ok) {
-        throw new Error("Failed to add HUD component");
+        throw new Error(`Failed to add HUD component (HTTP ${response.status})`);
     }
 }
 
 export async function setComponentAlignment(id: string, alignment: Alignment): Promise<void> {
-    await fetch(`${API_BASE}/client/components/${id}/alignment`, {
+    const response = await fetch(`${API_BASE}/client/components/${id}/alignment`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json"
         },
         body: JSON.stringify(alignment)
     });
+
+    // a refused save used to pass silently: the editor showed the new position, the client never got it
+    if (!response.ok) {
+        throw new Error(`Failed to save the HUD component position (HTTP ${response.status})`);
+    }
 }
 
 export async function bringComponentToFront(id: string): Promise<number> {
@@ -754,13 +792,20 @@ export function getComponentFileUrl(id: string, cacheKey?: string): string {
 }
 
 export async function setComponentSettings(id: string, settings: ConfigurableSetting): Promise<void> {
-    await fetch(`${API_BASE}/client/components/${id}/settings`, {
+    const response = await fetch(`${API_BASE}/client/components/${id}/settings`, {
         method: "PUT",
         headers: {
             "Content-Type": "application/json"
         },
         body: JSON.stringify(settings)
     });
+
+    // a refused save used to pass silently: the GUI showed the change, the client never got it
+    if (!response.ok) {
+        // the client's answer usually names the cause of an error: keep (a short part of) it
+        const detail = (await response.text().catch(() => "")).trim().slice(0, 200);
+        throw new Error(`Failed to save the HUD component settings (HTTP ${response.status}${detail ? `: ${detail}` : ""})`);
+    }
 }
 
 export async function getClientInfo(): Promise<ClientInfo> {
@@ -778,6 +823,7 @@ export async function getClientUpdate(): Promise<ClientUpdate> {
 }
 
 export async function reconnectToServer() {
+    gameLeave.at = performance.now();
     await fetch(`${API_BASE}/client/reconnect`, {
         method: "POST",
     });
@@ -842,18 +888,22 @@ export async function browserClose() {
     });
 }
 
+/**
+ * A fresh random username on every call. It is made here and not by the client: the client's generator
+ * (`/client/account/random-name`) only picks from a fixed list of names.
+ */
 export async function randomUsername(): Promise<string> {
-    let response = await fetch(`${API_BASE}/client/account/random-name`, {
-        method: "POST",
-    });
-    let data: GeneratorResult = await response.json();
-
-    return data.name;
+    return generateUsername();
 }
 
 let lastTypingState: boolean | null = null;
+// What the page asks for (a text field has focus) and what a screen wants regardless of that (see setTypingBaseline).
+// The client gets the two combined, so one cannot switch the other off.
+let wantTyping = false;
+let baselineTyping = false;
 
-export async function setTyping(typing: boolean) {
+async function sendTyping() {
+    const typing = wantTyping || baselineTyping;
     if (typing === lastTypingState) return;
     lastTypingState = typing;
     await fetch(`${API_BASE}/client/typing`, {
@@ -863,6 +913,21 @@ export async function setTyping(typing: boolean) {
         },
         body: JSON.stringify({typing})
     });
+}
+
+export async function setTyping(typing: boolean) {
+    wantTyping = typing;
+    await sendTyping();
+}
+
+/**
+ * Keeps the client's keyboard handling off (Esc and keybinds stay with the page) for as long as a screen asks for it, whatever
+ * `setTyping` says in the meantime. The title screen uses it: Esc there must not make the client close and re-open its title
+ * screen (the wallpaper blanked for a moment and the mouse was centred again).
+ */
+export async function setTypingBaseline(on: boolean) {
+    baselineTyping = on;
+    await sendTyping();
 }
 
 export async function getClientUser(): Promise<ClientUser | null> {

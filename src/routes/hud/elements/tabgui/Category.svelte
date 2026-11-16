@@ -7,6 +7,8 @@
     $: iconPath = `img/hud/tabgui/${name.toLowerCase()}.svg`;
 </script>
 
+<!-- The highlight is not drawn here: TabGui.svelte has one selection pill that slides from row to row (spring), this row only changes
+     its text / icon colour. A row is exactly --row high, the pill's position is index * --row. -->
 <div class="category" class:selected>
     <div class="icon">
         <span
@@ -25,45 +27,35 @@
 
 <style lang="scss">
 
-    .name {
-        font-weight: 500;
-        color: var(--tabgui-text-color);
-        font-size: 14px;
-        width: 100%;
-        padding: 7px 12px 7px 12px;
+    .category {
+        position: relative; // above the sliding pill
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        height: var(--row);
+        padding: 0 14px 0 10px;
+        color: var(--tabgui-text-dimmed-color);
+        transition: color .25s;
 
-        background: linear-gradient(
-            to left,
-            var(--tabgui-category-background-color) 50%,
-            var(--tabgui-category-active-background-color) 50%
-        );
-        background-size: 200% 100%;
-        background-position: right bottom;
-        will-change: background-position;
-        transition: background-position 0.2s ease-out;
-        overflow: hidden;
+        &.selected {
+            color: #fff;
+        }
     }
 
-    .category {
-        display: flex;
-
-        &.selected .icon {
-            color: var(--accent-color);
-        }
-
-        &.selected .name {
-            background-position: left bottom;
-        }
+    .name {
+        font-weight: 600;
+        font-size: 13px;
+        letter-spacing: -.01em;
+        white-space: nowrap;
     }
 
     .icon {
-        background-color: var(--tabgui-icon-background-color);
-        color: var(--tabgui-text-color);
-        width: 62px;
         display: flex;
         align-items: center;
         justify-content: center;
-        transition: color 0.2s ease-out;
+        width: 18px;
+        height: 18px;
+        flex: none;
     }
 
     .category-icon {
@@ -74,8 +66,12 @@
         mask-size: contain;
     }
 
+    // the icon file's own size is only used to size the mask: 18px, whatever the file is
     .category-icon-size {
         display: block;
+        width: 18px;
+        height: 18px;
+        object-fit: contain;
         visibility: hidden;
     }
 </style>

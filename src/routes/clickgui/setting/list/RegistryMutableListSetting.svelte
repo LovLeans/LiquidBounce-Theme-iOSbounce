@@ -12,7 +12,6 @@
     import RemovableItem from "../common/RemovableItem.svelte";
     import {SortableList} from "@jhubbardsf/svelte-sortablejs";
     import DraggableItem from "../common/DraggableItem.svelte";
-    import {escapeLayer} from "../../../../integration/escape";
 
     export let setting: ModuleSetting;
     export let path: string;
@@ -30,9 +29,6 @@
 
     let showChooser = false;
     let sortableRenderKey = 0;
-
-    const layer = escapeLayer(() => showChooser = false);
-    $: layer.setOpen(showChooser);
 
     type SortEvent = {
         oldIndex?: number | null;

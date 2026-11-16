@@ -4,48 +4,47 @@
 
     export let itemStack: ItemStack;
 
-    let damage = Math.ceil(10 - (itemStack.damage / itemStack.maxDamage * 10));
-    $: damage = Math.ceil(10 - (itemStack.damage / itemStack.maxDamage * 10));
+    // 0..100 (an item without durability, maxDamage 0, counts as intact)
+    let left = 100;
+    $: left = itemStack.maxDamage > 0 ? Math.max(0, Math.min(100, 100 - itemStack.damage / itemStack.maxDamage * 100)) : 100;
 </script>
 
 <div class="armor-status">
     <img class="icon" src={itemTextureUrl(itemStack.identifier)} alt={itemStack.identifier} />
     <div class="durability">
-        {#each Array.from({ length: 10 }, (x, i) => 10 - i) as index}
-            <div class="point" class:active={index <= damage}></div>
-        {/each}
+        <div class="left" style="height: {left}%"></div>
     </div>
 </div>
 
 <style lang="scss">
 
+    // the armour piece and a thin vertical capsule that drains with its durability
     .armor-status {
         display: flex;
         align-items: center;
-        column-gap: 5px;
+        column-gap: 4px;
     }
 
     .icon {
-        height: 30px;
-        width: 30px;
+        height: 26px;
+        width: 26px;
         image-rendering: pixelated;
     }
 
     .durability {
         display: flex;
-        flex-direction: column;
-        row-gap: 1px;
+        align-items: flex-end;
+        height: 26px;
+        width: 4px;
+        border-radius: 2px;
+        background: var(--targethud-armor-point-background-color);
+        overflow: hidden;
 
-        .point {
-            background-color: var(--targethud-armor-point-background-color);
-            height: 3px;
-            width: 5px;
-            border-radius: 1px;
-            transition: ease background-color 0.7s;
-
-            &.active {
-                background-color: var(--targethud-armor-point-active-color);
-            }
+        .left {
+            width: 100%;
+            border-radius: 2px;
+            background: var(--targethud-armor-point-active-color);
+            transition: height .6s var(--hud-smooth);
         }
     }
 </style>

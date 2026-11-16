@@ -11,7 +11,7 @@ function connect() {
 
     ws.onopen = () => {
         console.log("[WS] Connected to server");
-        alwaysListeners.get("socketReady")?.forEach(callback => callback());
+        dispatch(alwaysListeners.get("socketReady"), undefined, "socketReady");
     };
 
     ws.onclose = () => {
@@ -26,12 +26,40 @@ function connect() {
     };
 
     ws.onmessage = (event) => {
-        const json = JSON.parse(event.data);
+        let json;
+        try {
+            json = JSON.parse(event.data);
+        } catch (e) {
+            // one malformed frame must not throw inside the socket handler
+            console.error("[WS] Dropped a frame that is not valid JSON", e);
+            return;
+        }
         const eventName = json.name;
         const eventData = json.event;
 
-        alwaysListeners.get(eventName)?.forEach(callback => callback(eventData));
-        listeners.get(eventName)?.forEach(callback => callback(eventData));
+        dispatch(alwaysListeners.get(eventName), eventData, eventName);
+        dispatch(listeners.get(eventName), eventData, eventName);
+    }
+}
+
+/**
+ * Calls every listener, each on its own. A listener that throws used to abort the forEach, so every listener registered after it
+ * (other HUD elements, other screens) silently stopped receiving that event for good.
+ */
+function dispatch(callbacks: Function[] | undefined, eventData: unknown, eventName: string) {
+    if (!callbacks) {
+        return;
+    }
+    for (const callback of callbacks) {
+        try {
+            const result = callback(eventData);
+            // async listeners fail as a rejected promise, not as a throw
+            if (result && typeof result.catch === "function") {
+                result.catch((e: unknown) => console.error(`[WS] listener of "${eventName}" failed`, e));
+            }
+        } catch (e) {
+            console.error(`[WS] listener of "${eventName}" failed`, e);
+        }
     }
 }
 
@@ -44,6 +72,21 @@ export function listenAlways<NAME extends keyof EventMap>(eventName: NAME, callb
     }
 
     alwaysListeners.get(eventName)!!.push(callback);
+}
+
+/**
+ * Like {@link listen}, but the router's `cleanupListeners()` does not remove it: it lives exactly as long as the component.
+ *
+ * `cleanupListeners()` runs on every route change, also while a screen that is still mounted is on its way out or turns around
+ * (the iOS ClickGUI does that). A plain `listen` made by a component of such a screen is gone while the component is still on screen.
+ *
+ * Should only be used inside a Svelte component.
+ */
+export function listenSticky<NAME extends keyof EventMap>(eventName: NAME, callback: (event: EventMap[NAME]) => void) {
+    listenAlways(eventName, callback);
+    onDestroy(() => {
+        alwaysListeners.set(eventName, alwaysListeners.get(eventName)?.filter(handler => handler !== callback) ?? []);
+    });
 }
 
 /**

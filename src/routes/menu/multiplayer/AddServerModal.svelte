@@ -1,46 +1,76 @@
+<!--
+    Add Server in the iOS style: a window that grows out of the Add Server button (see IosDialog). Mounted by Multiplayer.svelte
+    while it is open, and removed in `onclosed`; `onadded` comes once the server is saved, so the list can be reloaded.
+-->
 <script lang="ts">
-    import Modal from "../common/modal/Modal.svelte";
-    import SingleSelect from "../common/setting/select/SingleSelect.svelte";
-    import ButtonSetting from "../common/setting/ButtonSetting.svelte";
-    import IconTextInput from "../common/setting/IconTextInput.svelte";
+    import IosDialog from "../ios/IosDialog.svelte";
+    import IosField from "../ios/IosField.svelte";
+    import IosSegmented from "../ios/IosSegmented.svelte";
+    import IosButton from "../ios/IosButton.svelte";
     import {addServer as restAddServer} from "../../../integration/rest";
-    import {createEventDispatcher} from "svelte";
 
-    export let visible: boolean;
-
-    const dispatch = createEventDispatcher();
-
-    let name = "Minecraft Server";
-    let address = "";
-    let resourcePackPolicy = "Prompt";
-
-    $: disabled = validateInput(address, name);
-    $: address = address.trim();
-
-    function validateInput(address: string, name: string): boolean {
-        return address.length === 0 || name.length === 0;
+    interface Props {
+        /** The button the window grows out of. */
+        anchor: () => HTMLElement | undefined;
+        /** The server was saved. */
+        onadded?: () => void;
+        /** The window was told to close and is shrinking back into its button. */
+        onclosing?: () => void;
+        onreopening?: () => void;
+        /** The window is back in its button: remove it. */
+        onclosed: () => void;
     }
+
+    let {anchor, onadded, onclosing, onreopening, onclosed}: Props = $props();
+
+    let dialog: ReturnType<typeof IosDialog> | undefined = $state();
+    let nameField: HTMLInputElement | undefined = $state();
+    let name = $state("Minecraft Server");
+    let address = $state("");
+    let resourcePackPolicy = $state("Prompt");
+    let busy = $state(false);
+
+    const disabled = $derived(busy || address.trim().length === 0 || name.length === 0);
 
     async function addServer() {
         if (disabled) {
             return;
         }
-        await restAddServer(name, address, resourcePackPolicy);
-        dispatch("serverAdd");
-        cleanUp();
-        visible = false;
-    }
 
-    function cleanUp() {
-        name = "Minecraft Server";
-        address = "";
-        resourcePackPolicy = "";
+        busy = true;
+        try {
+            await restAddServer(name, address.trim(), resourcePackPolicy);
+            onadded?.();
+            dialog?.close();
+        } catch (error) {
+            // the dialog stays open so the entry can be tried again (was an unhandled rejection)
+            console.warn("[AddServer] the client did not add the server", error);
+        } finally {
+            busy = false;
+        }
     }
 </script>
 
-<Modal bind:visible={visible} title="Add Server" on:close={cleanUp}>
-    <IconTextInput title="Name" icon="info" bind:value={name}/>
-    <IconTextInput title="Address" icon="server" bind:value={address}/>
-    <SingleSelect title="Server Resource Packs" options={["Prompt", "Enabled", "Disabled"]} bind:value={resourcePackPolicy}/>
-    <ButtonSetting title="Add Server" on:click={addServer} {disabled} listenForEnter={true} inset={true}/>
-</Modal>
+<IosDialog bind:this={dialog}
+           title="Add Server"
+           {anchor}
+           size={{width: 540, height: 372}}
+           onopened={() => nameField?.focus({preventScroll: true})}
+           {onclosing}
+           {onreopening}
+           {onclosed}>
+    <IosField label="Name" placeholder="Minecraft Server" bind:value={name} bind:element={nameField} onenter={addServer}/>
+    <IosField label="Address" placeholder="play.example.com" bind:value={address} onenter={addServer}/>
+    <IosSegmented label="Server Resource Packs" options={["Prompt", "Enabled", "Disabled"]} bind:value={resourcePackPolicy}/>
+
+    <div class="actions">
+        <IosButton variant="primary" {disabled} onclick={addServer}>Add Server</IosButton>
+    </div>
+</IosDialog>
+
+<style>
+    .actions {
+        margin-top: auto;
+        display: grid;
+    }
+</style>

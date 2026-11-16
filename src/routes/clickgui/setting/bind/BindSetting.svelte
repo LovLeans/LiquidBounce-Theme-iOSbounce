@@ -7,7 +7,6 @@
     import BindDisplay from "./BindDisplay.svelte";
     import SwitchBindAction from "./SwitchBindAction.svelte";
     import {isClickGuiScreen, UNKNOWN_KEY} from "../../../../util/utils";
-    import {escapeLayer} from "../../../../integration/escape";
 
     /**
      * SDL keycodes of the modifier keys (see org.lwjgl.sdl.SDLKeycode)
@@ -142,9 +141,6 @@
         setting = {...cSetting};
         dispatch("change");
     }
-
-    const layer = escapeLayer(() => handleActionChange(UNKNOWN_KEY));
-    $: layer.setOpen(binding);
 </script>
 
 <div class="setting" class:has-value={cSetting.value.boundKey !== UNKNOWN_KEY}>

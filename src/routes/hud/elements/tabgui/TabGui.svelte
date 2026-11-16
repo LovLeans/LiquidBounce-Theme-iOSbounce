@@ -5,8 +5,8 @@
     import {groupByCategory} from "../../../../integration/util";
     import Category from "./Category.svelte";
     import {getTextWidth} from "../../../../integration/text_measurement";
-    import {listen} from "../../../../integration/ws";
-    import {fly} from "svelte/transition";
+    import {listenSticky} from "../../../../integration/ws";
+    import {pop, popOut} from "../../motion";
     import Module from "./Module.svelte";
     import type {KeyEvent, ModuleToggleEvent} from "../../../../integration/events";
 
@@ -23,7 +23,7 @@
         groupedModules = groupByCategory(modules);
         categories = Object.keys(groupedModules).sort(
             (a, b) =>
-                getTextWidth(b, "Inter 14px") - getTextWidth(a, "Inter 14px"),
+                getTextWidth(b, "600 13px Inter") - getTextWidth(a, "600 13px Inter"),
         );
     });
 
@@ -71,14 +71,19 @@
                     return;
                 }
                 const mod = renderedModules[selectedModuleIndex];
-                await setModuleEnabled(mod.name, !mod.enabled);
+                try {
+                    await setModuleEnabled(mod.name, !mod.enabled);
+                } catch (e) {
+                    // refused by the client: the list keeps following its moduleToggle events
+                    console.warn("[TabGui] could not switch", mod.name, e);
+                }
                 break;
         }
     }
 
-    listen("key", handleKeyDown);
+    listenSticky("key", handleKeyDown);
 
-    listen("moduleToggle", (e: ModuleToggleEvent) => {
+    listenSticky("moduleToggle", (e: ModuleToggleEvent) => {
         const moduleName = e.moduleName;
         const moduleEnabled = e.enabled;
 
@@ -93,48 +98,79 @@
     });
 </script>
 
+<!-- iPadOS sidebar + iOS menu. Both lists have fixed-height rows (--row), so ONE selection pill per list can sit at
+     index * --row and slide there on a spring; the rows themselves only recolour. -->
 <div class="tabgui">
     <div class="categories" bind:this={categoriesElement}>
-        {#each categories as name, index}
-            <Category {name} selected={index === selectedCategoryIndex} />
-        {/each}
+        <div class="rows" style="--row: 34px; --i: {selectedCategoryIndex}">
+            <div class="pill accent"></div>
+            {#each categories as name, index}
+                <Category {name} selected={index === selectedCategoryIndex} />
+            {/each}
+        </div>
     </div>
 
     {#if renderedModules.length > 0}
-        <div class="modules" transition:fly={{ x: -10, duration: 200 }} style="height: {categoriesElement.offsetHeight}px">
-            {#each renderedModules as { name, enabled }, index}
-                <Module {name} {enabled} selected={selectedModuleIndex === index} />
-            {/each}
+        <div class="modules" in:pop={{ x: -12, from: .94 }} out:popOut={{ x: -10 }} style="height: {categoriesElement.offsetHeight}px">
+            <div class="rows" style="--row: 32px; --i: {selectedModuleIndex}">
+                <div class="pill"></div>
+                {#each renderedModules as { name, enabled }, index}
+                    <Module {name} {enabled} selected={selectedModuleIndex === index} />
+                {/each}
+            </div>
         </div>
     {/if}
 </div>
 
 <style lang="scss">
+    @use "../../glass" as *;
 
     .tabgui {
         display: flex;
+        align-items: flex-start;
+        gap: 8px;
     }
 
-    .categories {
-        background-clip: content-box;
-        display: flex;
-        flex-direction: column;
-        border-radius: 5px;
-        overflow: hidden;
+    .categories, .modules {
+        @include hud-glass(var(--hud-r-card), var(--tabgui-background-color));
+
+        padding: 5px;
     }
 
     .modules {
-      background-clip: content-box;
-      background-color: var(--tabgui-modules-background-color);
-      margin-left: 6px;
-      border-radius: 5px;
-      min-width: 100px;
-      display: flex;
-      flex-direction: column;
-      overflow: auto;
+        min-width: 150px;
+        box-sizing: border-box;
+        overflow: auto;
 
-      &::-webkit-scrollbar {
-        width: 0;
-      }
+        &::-webkit-scrollbar {
+            width: 0;
+        }
+    }
+
+    .rows {
+        position: relative;
+    }
+
+    // the sliding selection: same corner radius as the card minus its padding (concentric)
+    .pill {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: var(--row);
+        border-radius: 15px;
+        transform: translateY(calc(var(--i) * var(--row)));
+        transition: transform .5s var(--hud-spring);
+        will-change: transform;
+        background: var(--tabgui-module-selected-background-color);
+
+        &.accent {
+            background: var(--tabgui-category-active-background-color);
+            box-shadow: 0 2px 10px color-mix(in srgb, var(--tabgui-category-active-background-color) 45%, transparent);
+        }
+
+        @supports (corner-shape: squircle) {
+            corner-shape: squircle;
+        }
     }
 </style>

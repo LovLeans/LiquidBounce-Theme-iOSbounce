@@ -1,131 +1,75 @@
-# LiquidBounce Default Theme
+# iOSbounce
 
-This repository contains the source code for the LiquidBounce Default Theme, built using [Svelte](https://svelte.dev/). 
-It is intended for development, customization, and distribution through the LiquidBounce theme system and marketplace.
+An iOS-style theme for the [LiquidBounce](https://github.com/CCBlueX/LiquidBounce) client, built with [Svelte](https://svelte.dev/).
+It is a fork of CCBlueX's [LiquidBounce-Theme](https://github.com/CCBlueX/LiquidBounce-Theme), the default theme.
 
----
+## Download
 
-## Getting Started with a Custom Theme
+**[Download the latest build](../../releases/latest/download/iosbounce.zip)**: compiled from the newest commit, no GitHub login needed.
 
-If you want to create your own LiquidBounce theme, the recommended starting point is to **fork the official default theme repository**:
+Every commit is also built by [GitHub Actions](../../actions): open the newest run and take the zip under *Artifacts*.
 
-https://github.com/CCBlueX/LiquidBounce-Theme
+### Install
 
-Forking this repository gives you a fully working baseline with proper project structure, build configuration, and marketplace integration already set up. From there, you can modify the UI, styles, and components to create your own custom theme while staying compatible with LiquidBounce’s theming system.
+1. In the client, run `.client theme browse` to open the themes folder.
+2. Unzip the download there, so you end up with a folder `iosbounce` that has `metadata.json` directly inside.
+3. Apply it with `.client theme set iosbounce`.
 
----
+<!-- Add a screenshot here: ![iOSbounce](docs/screenshot.png) -->
+
+## What's in it
+
+- **Lock-screen main menu**: the title screen is a customizable lock screen with a clock, date and icons. It ships with six built-in wallpapers, and you can add your own photos from the **+** menu.
+- **iOS ClickGUI and HUD editor**: a rebuilt ClickGUI with an iOS look, plus an editor for the HUD components (`src/routes/clickgui-ios/`).
+- **iOS-style menus**: the multiplayer, singleplayer, alt manager and proxy manager screens use a shared set of iOS components (`src/routes/menu/ios/`).
 
 ## Development
 
-### Prerequisites
+You need [Node.js](https://nodejs.org/) (the current LTS is recommended).
 
-Ensure the following software is installed before proceeding:
-
-- Node.js (latest LTS or stable release recommended)
-
-### Setup
-
-1. **Install dependencies**
+1. Install dependencies:
 
     ```bash
     npm install
     ```
 
-2. **Launch LiquidBounce**
-
-    Start the LiquidBounce client before running the development server.
-
-3. **Start the development server**
+2. Start the LiquidBounce client, then start the dev server:
 
     ```bash
     npm run dev
     ```
 
-4. **Set the theme in the client**
-
-    Use the live development URL provided by the dev server (for example, http://localhost:5173/):
+3. In the client, point the theme at the dev server's URL (for example `http://localhost:5173/`):
 
     ```
     .client theme set <live-url>
     ```
 
-
-5. **Open the theme in a browser**
-
-    Run the following command in the client and select the UI you want to open in your system browser:
+4. To open a screen of the theme in your system browser, run this in the client and pick the UI:
 
     ```
     .client integration menu
     ```
 
-### Building for Production
+## Building
 
-Follow these steps to create a production-ready build of the theme.
+```bash
+npm run build
+```
 
-1. **Build the theme**
+The production build is written to `dist/`. To install it:
 
-    ```bash
-    npm run build
-    ```
+1. Open your LiquidBounce themes folder with `.client theme browse`.
+2. Copy `dist/` into it and rename the copy to the theme name you want, for example `iosbounce`.
+3. Apply it with `.client theme set iosbounce`.
 
-2. **Locate the build output**
+## Notes
 
-    - The production build is generated in the `dist` directory
+- The built-in wallpapers are inlined into the JavaScript bundle (`?inline` imports in `src/routes/menu/title/main-menu/wallpapers.ts`). Larger image files make the bundle bigger and use more memory when the menu decodes them.
+- Photos imported through the **+** menu are scaled down to at most 3840 px on the longest side and saved in the client's storage. If a photo is too large to be saved, the menu shows a toast and the photo is only kept until restart.
 
-    - This directory contains the optimized and minified theme files
+## Credits and license
 
-3. **Deploy to the themes directory**
+iOSbounce is made by LovLean. It is based on the LiquidBounce default theme by [CCBlueX](https://github.com/CCBlueX) and is released under the [GNU General Public License v3.0 or later](LICENSE).
 
-    - Copy the entire dist directory into your LiquidBounce themes directory
-
-    - You can open the themes directory by running:
-   
-    ```
-    .client theme browse
-    ```
-
-    - Rename the dist folder to your desired theme name
-
-4. **Apply the theme**
-
-    ```
-    .client theme set <your-theme-name>
-    ```
-
-## Marketplace Publishing
-
-To publish the theme to the LiquidBounce Marketplace, complete the following steps.
-
-1. **Generate an API token**
-
-    - Visit: https://liquidbounce.net/account
-
-    - Generate an API token from your account settings
-
-2. **Obtain the marketplace item ID**
-
-    - Navigate to: https://liquidbounce.net/marketplace
-
-    - Open your marketplace item page
-
-    - Copy the value from the Item ID field displayed on the right side
-
-3. **Configure the repository**
-
-    - Add `API_TOKEN` as a repository secret under Settings → Secrets and variables → Actions
-
-    - Update the following values in `.github/workflows/build.yml`:
-
-      - `MARKETPLACE_ITEM_ID`
-
-      - `ZIP_NAME`
-
-4. **Enable publishing**
-
-    - Uncomment the GitHub release and marketplace upload steps in:
-   
-    ```
-    .github/workflows/build.yml
-    ```
-
-Once configured, the workflow will automatically build and publish the theme when triggered.
+The Inter font in `public/fonts/` is © The Inter Project Authors and is licensed under the SIL Open Font License 1.1 (see [`public/fonts/OFL.txt`](public/fonts/OFL.txt)).

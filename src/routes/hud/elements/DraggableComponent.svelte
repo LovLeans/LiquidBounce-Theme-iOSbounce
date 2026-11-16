@@ -1,11 +1,11 @@
 <script lang="ts">
-    import {getContext, onMount, tick} from "svelte";
+    import {getContext, onDestroy, onMount, tick} from "svelte";
+    import {reloadHud} from "../reload";
 
     import type {KeyboardKeyEvent, ScaleFactorChangeEvent} from "../../../integration/events";
     import {bringComponentToFront, getGameWindow, setComponentAlignment} from "../../../integration/rest";
     import {type Alignment, HorizontalAlignment, VerticalAlignment} from "../../../integration/types.js";
-    import {listen} from "../../../integration/ws";
-    import ComponentSettings from "../../clickgui/tabs/hud_editor/ComponentSettings.svelte";
+    import {listenSticky} from "../../../integration/ws";
     import {
         type HorizontalAnchorZone,
         HUD_EDITOR_ELEMENTS_CONTEXT,
@@ -13,7 +13,7 @@
         HUD_EDITOR_MAGNET_THRESHOLD,
         type HudEditorDragState,
         type VerticalAnchorZone
-    } from "../../clickgui/tabs/hud_editor/constants";
+    } from "../constants";
     import {fade, type TransitionConfig} from "svelte/transition";
 
     export let alignment: Alignment;
@@ -21,14 +21,26 @@
     export let componentName: string;
     export let inEditor: boolean;
     export let onDragStateChange: ((state: HudEditorDragState) => void) | undefined = undefined;
+    // called with the position a drag ended at, before it is sent to the client: the theme keeps the position itself (see positions.ts)
+    export let onPositionSaved: ((alignment: Alignment) => void) | undefined = undefined;
+    // called when the user removes the component in the editor (the [x] of the popover): the theme hides it itself, see positions.ts
+    export let onRemoved: (() => void) | undefined = undefined;
     export let magneticallyReferenced = false;
     export let width: number | undefined = undefined;
     export let height: number | undefined = undefined;
     export let zIndex = 0;
+    // the fade-in only plays while the HUD first appears (see Hud.svelte), not when the client swaps the components for new ones
+    export let animateIn = true;
+    // the popover shown over the component in the HUD editor (the iOS GUI passes its own); nothing when not given
+    export let settingsComponent: any = undefined;
 
     let scaleFactor = 2;
     let element: HTMLElement | undefined;
     let isDragging = false;
+    // The position the drag ended up at, copied after every mouse move. Only a drag that really moved is saved, and it is saved from this copy:
+    // the `alignment` prop can be swapped for the client's own object in the middle of a drag (a `componentsUpdate`), and a click used to save
+    // whatever the box held at that moment, which was often the client's old position.
+    let dragResult: Alignment | undefined;
     let isGridIgnored = false;
     let pointerCenterOffsetX = 0;
     let pointerCenterOffsetY = 0;
@@ -50,7 +62,12 @@
 
     const editorElements = getContext<Map<string, HTMLElement>>(HUD_EDITOR_ELEMENTS_CONTEXT);
 
-    $: styleString = generateStyleString(alignment);
+    $: styleString = generateStyleString(alignment ?? {
+        horizontalAlignment: HorizontalAlignment.LEFT,
+        verticalAlignment: VerticalAlignment.TOP,
+        horizontalOffset: 0,
+        verticalOffset: 0
+    });
     $: displayedZIndex = zIndex;
     $: sizeStyleString = (width !== undefined && height !== undefined)
         ? `width: ${width}px; height: ${height}px;`
@@ -293,6 +310,7 @@
         }
 
         isDragging = true;
+        dragResult = undefined;
         const horizontalCenter = getHorizontalCenter();
         const verticalCenter = getVerticalCenter();
         const cursorX = toHudCoordinate(event.clientX);
@@ -311,7 +329,8 @@
     }
 
     async function updateZIndex(): Promise<void> {
-        displayedZIndex = await bringComponentToFront(componentId);
+        const id = componentId;
+        displayedZIndex = await bringComponentToFront(id);
     }
 
     async function updateDisplayedPosition(): Promise<void> {
@@ -327,6 +346,39 @@
             y: Math.round(bounds.y)
         };
         positionOnTop = bounds.top + bounds.height / 2 >= window.innerHeight / 2;
+    }
+
+    // A mouse reports 500-1000 times a second, the screen draws 60-240. Every onMouseMove does several forced layouts (getBoundingClientRect
+    // of this box and of the snap targets) and state writes, so dragging lagged. Only the newest position of a frame is handled now;
+    // endDrag() handles a pending one first, so the drop still lands exactly where the mouse was released.
+    let pendingMove: MouseEvent | undefined;
+    let moveFrame = 0;
+
+    function onMouseMoveFrame(event: MouseEvent): void {
+        if (!isDragging) {
+            return;
+        }
+
+        pendingMove = event;
+        if (!moveFrame) {
+            moveFrame = requestAnimationFrame(() => {
+                moveFrame = 0;
+                flushMove();
+            });
+        }
+    }
+
+    function flushMove(): void {
+        if (moveFrame) {
+            cancelAnimationFrame(moveFrame);
+            moveFrame = 0;
+        }
+
+        const event = pendingMove;
+        pendingMove = undefined;
+        if (event) {
+            onMouseMove(event);
+        }
     }
 
     function onMouseMove(event: MouseEvent): void {
@@ -373,6 +425,7 @@
             verticalSnap?.targetId,
         );
         updateDisplayedPosition();
+        dragResult = {...alignment};
     }
 
     function clampHorizontalOffset(offset: number): number {
@@ -425,19 +478,58 @@
         return isGridIgnored ? value : Math.round(value / HUD_EDITOR_GRID_SIZE) * HUD_EDITOR_GRID_SIZE;
     }
 
-    function onMouseUp(): void {
+    // Saves go one after another, so a slow one cannot land after (and overwrite) a newer one.
+    let saveQueue: Promise<void> = Promise.resolve();
+
+    function saveAlignment(result: Alignment): void {
+        const id = componentId;
+        const snapshot: Alignment = {...result};
+
+        onPositionSaved?.({...snapshot});
+
+        saveQueue = saveQueue.then(async () => {
+            for (let attempt = 0; attempt < 3; attempt++) {
+                try {
+                    await setComponentAlignment(id, snapshot);
+                    return;
+                } catch (e) {
+                    console.warn("[Hud] could not save the position of", id, e);
+                    await new Promise(resolve => setTimeout(resolve, 250 * (attempt + 1)));
+                }
+            }
+
+            // Not saved: do not leave a position on screen that the client does not have.
+            reloadHud();
+        });
+    }
+
+    function endDrag(): void {
         if (!isDragging) {
             return;
         }
 
+        flushMove();
         isDragging = false;
         verticalGuide = undefined;
         horizontalGuide = undefined;
         horizontalTargetId = undefined;
         verticalTargetId = undefined;
         emitDragState(false);
-        setComponentAlignment(componentId, alignment);
+
+        const result = dragResult;
+        dragResult = undefined;
+
+        if (result) {
+            saveAlignment(result);
+        }
     }
+
+    function onMouseUp(): void {
+        endDrag();
+    }
+
+    // The GUI can be closed while a component is being dragged: the drag then ends here instead of being lost unsaved.
+    onDestroy(endDrag);
 
     function generateStyleString(alignment: Alignment): string {
         const translateX = alignment.horizontalAlignment === HorizontalAlignment.CENTER_TRANSLATED ? "-50%" : "0";
@@ -475,25 +567,37 @@
         }
     }
 
+    // Intro only. With an outro (`transition:`) a component that left the list stayed in the page until its fade-out ended; when that never
+    // ended (the page not being painted, a list update in the middle of it) the box stayed for good: invisible, but still on top and taking the mouse.
     function editorFade(node: Element): TransitionConfig {
         return fade(node, {
-            duration: inEditor ? 200 : 0
+            duration: inEditor && animateIn ? 200 : 0
         });
     }
 
-    listen("keyboardKey", (e: KeyboardKeyEvent) => {
+    listenSticky("keyboardKey", (e: KeyboardKeyEvent) => {
         if (e.key === "key.keyboard.left.shift") {
             isGridIgnored = e.action === 1;
         }
     });
 
-    onMount(() => {
-        if (!inEditor || !element) {
-            return;
+    // The box lives on when the client gives its component a new id (see Hud.svelte), so the editor's map of boxes (used for snapping to
+    // the other components) has to follow the id: under the old one the box would still be found as "another component" and snap to itself.
+    let registeredId: string | undefined;
+
+    $: if (inEditor && element && registeredId !== componentId) {
+        if (registeredId !== undefined) {
+            editorElements.delete(registeredId);
         }
 
         editorElements.set(componentId, element);
-        return () => editorElements.delete(componentId);
+        registeredId = componentId;
+    }
+
+    onDestroy(() => {
+        if (registeredId !== undefined) {
+            editorElements.delete(registeredId);
+        }
     });
 
     onMount(async () => {
@@ -501,18 +605,18 @@
         scaleFactor = gameWindow.scaleFactor;
     });
 
-    listen("scaleFactorChange", (event: ScaleFactorChangeEvent) => {
+    listenSticky("scaleFactorChange", (event: ScaleFactorChangeEvent) => {
         scaleFactor = event.scaleFactor;
     });
 </script>
 
 <svelte:window
         on:mouseup={onMouseUp}
-        on:mousemove={onMouseMove}
+        on:mousemove={onMouseMoveFrame}
 />
 
-<div class="draggable-element" style="{styleString} z-index: {displayedZIndex};" bind:this={element}
-     transition:editorFade|global>
+<div class="draggable-element" data-component-id={componentId} style="{styleString} z-index: {displayedZIndex};" bind:this={element}
+     in:editorFade|global>
     <!-- svelte-ignore a11y-no-static-element-interactions -->
     <div
             class="contained-element"
@@ -528,11 +632,12 @@
             {displayPosition.x} &#215; {displayPosition.y}
         </div>
     {/if}
-    {#if inEditor}
-        <ComponentSettings
+    {#if inEditor && settingsComponent}
+        <svelte:component this={settingsComponent}
                 name={componentName}
                 id={componentId}
                 {alignment}
+                {onRemoved}
                 overlayOffset={isDragging ? POSITION_OVERLAY_OFFSET : 0}
         />
     {/if}
@@ -547,6 +652,7 @@
     .editor-mode {
         outline: solid 1px var(--clickgui-hud-editor-draggable-element-outline-color);
         background-color: var(--clickgui-hud-editor-draggable-element-background-color);
+        border-radius: var(--clickgui-hud-editor-radius, 0);
         transition: background-color 100ms ease;
     }
 
@@ -565,6 +671,8 @@
         text-wrap: nowrap;
         outline: solid 1px var(--clickgui-hud-editor-draggable-element-position-outline-color);
         background-color: var(--clickgui-hud-editor-draggable-element-position-background-color);
+        border-radius: var(--clickgui-hud-editor-badge-radius, 0);
+        padding: var(--clickgui-hud-editor-badge-padding, 0);
     }
 
     .position.top {

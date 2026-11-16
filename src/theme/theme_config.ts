@@ -5,13 +5,13 @@ import type {SpaceSeperatedNamesChangeEvent} from "../integration/events";
 
 export let spaceSeperatedNames = writable(false);
 
-const wordBoundary = /[a-z](?=[A-Z0-9])|[A-Z0-9](?=[A-Z][a-z])/g;
+const regex = /[A-Z]?[a-z]+|[A-Z]+[0-9]+|[0-9]+|[A-Z]+(?![a-z])/g;
 
 /**
- * Inserts spaces between camel case words, keeping every other character.
+ * Handles space seperated names if enabled.
  */
 export function convertToSpacedString(name: string): string {
-    return name.replace(wordBoundary, "$& ");
+    return (name.match(regex) as string[]).join(" ");
 }
 
 async function updateSettings() {

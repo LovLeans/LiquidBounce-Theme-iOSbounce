@@ -5,7 +5,6 @@
     import GenericSetting from "../../../clickgui/setting/common/GenericSetting.svelte";
     import {quintOut} from "svelte/easing";
     import {convertToSpacedString} from "../../../../theme/theme_config";
-    import {escapeLayer} from "../../../../integration/escape";
 
     interface Props {
         value: NesterSetting,
@@ -44,9 +43,6 @@
             expanded = false;
         }
     }
-
-    const layer = escapeLayer(() => expanded = false);
-    $effect(() => layer.setOpen(expanded));
 </script>
 
 <svelte:window on:click={handleWindowClick}/>

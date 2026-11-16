@@ -1,25 +1,32 @@
+<!-- Direct Login > Session: log in with a session token right away, nothing is saved. -->
 <script lang="ts">
-    import Tab from "../../common/modal/Tab.svelte";
-    import IconTextInput from "../../common/setting/IconTextInput.svelte";
-    import ButtonSetting from "../../common/setting/ButtonSetting.svelte";
+    import IosPane from "../../ios/IosPane.svelte";
+    import IosField from "../../ios/IosField.svelte";
+    import IosButton from "../../ios/IosButton.svelte";
     import {directLoginToSessionAccount} from "../../../../integration/rest";
 
-    let token = "";
-    $: disabled = validateSessionId(token);
-
-    function validateSessionId(token: string): boolean {
-        return token.length === 0;
+    interface Props {
+        busy: boolean;
+        run: (job: () => Promise<unknown>, watchdogMs?: number) => void;
     }
 
-    async function login() {
-        if (disabled) {
-            return;
+    let {busy, run}: Props = $props();
+
+    let token = $state("");
+
+    const disabled = $derived(busy || token.trim().length === 0);
+
+    function login() {
+        if (!disabled) {
+            run(() => directLoginToSessionAccount(token.trim()));
         }
-        await directLoginToSessionAccount(token);
     }
 </script>
 
-<Tab>
-    <IconTextInput icon="user" title="Session ID" bind:value={token}/>
-    <ButtonSetting title="Login" {disabled} on:click={login} listenForEnter={true} inset={true} />
-</Tab>
+<IosPane>
+    <IosField label="Session ID" placeholder="Session token" bind:value={token} onenter={login}/>
+
+    {#snippet actions()}
+        <IosButton variant="primary" {disabled} onclick={login}>{busy ? "Logging in…" : "Login"}</IosButton>
+    {/snippet}
+</IosPane>

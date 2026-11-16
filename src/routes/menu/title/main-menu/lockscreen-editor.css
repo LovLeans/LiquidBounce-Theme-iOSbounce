@@ -1,0 +1,219 @@
+.lb-menu{
+ --glass:rgba(62,64,76,.4);
+ --glass-edge:inset 0 0 0 1px rgba(255,255,255,.12),inset 0 1px 0 rgba(255,255,255,.22),inset 0 -1px 0 rgba(0,0,0,.12);
+ --glass-lift:0 1px 2px rgba(0,0,0,.18),0 8px 22px rgba(0,0,0,.22);
+ --card-ring:inset 0 0 0 1px rgba(255,255,255,.14),inset 0 1px 0 rgba(255,255,255,.1);
+ /* how a popover grows out of its arrow: an underdamped spring (19.4 rad/s, damping ratio .78: ~2% overshoot at .26s, settled after .41s),
+    fitted to a frame-by-frame measurement of the real thing (it grows past full size by ~1.8%, then eases back). Same maths as mkSpring() in launcher.ts. */
+ --pop-spring:linear(0,0.0073,0.0272,0.0573,0.0954,0.1394,0.1878,0.2391,0.292,0.3456,0.3989,0.4512,0.5021,0.5509,0.5975,0.6415,0.6828,0.7212,0.7568,0.7895,0.8194,0.8466,0.8711,0.8932,0.9128,0.9302,0.9455,0.9589,0.9705,0.9804,0.9889,0.996,1.002,1.0068,1.0107,1.0138,1.0161,1.0178,1.019,1.0196,1.0199,1.0199,1.0195,1.019,1.0183,1.0174,1.0165,1.0155,1.0145,1.0134,1.0123,1.0113,1.0102,1.0093,1.0083,1.0074,1.0066,1.0058,1.0051,1.0044,1.0038,1.0032,1.0027,1.0023,1)}
+.lb-menu #wbg{position:absolute;inset:0;overflow:hidden;background:radial-gradient(120% 85% at 50% 42%,#1a1b21 0,#0a0a0d 58%,#000 100%);visibility:hidden;pointer-events:none}
+.lb-menu #wbg .wbl{position:absolute;left:-90px;top:-90px;width:386.5px;height:237px;transform-origin:0 0;transform:scale(4);will-change:opacity}
+.lb-menu #wbg:after{content:"";position:absolute;inset:0;background:radial-gradient(120% 90% at 50% 45%,transparent 35%,rgba(0,0,0,.5))}
+.lb-menu .cc i{position:absolute;left:0;right:0;top:66px;text-align:center;font:600 22px/22px var(--ui);font-style:normal;color:rgba(255,255,255,.93);text-shadow:0 2px 14px rgba(0,0,0,.22)}
+.lb-menu #car{position:absolute;inset:0;pointer-events:none;visibility:hidden;z-index:3}
+.lb-menu .cd{position:absolute;left:0;top:0;width:1366px;height:768px;overflow:hidden;border-radius:34px;background:#0c0c0e;box-shadow:var(--card-shadow);will-change:transform}
+.lb-menu .cd:after{content:"";position:absolute;inset:0;border-radius:inherit;box-shadow:var(--card-ring);pointer-events:none}
+.lb-menu .dm{position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;will-change:opacity}
+.lb-menu .cd.add{display:grid;place-items:center;background:linear-gradient(160deg,#25262d,#111115)}
+.lb-menu .cd.add svg{width:120px;height:120px;opacity:.5}
+.lb-menu .cw{position:absolute;inset:0}
+.lb-menu .cc{position:absolute;inset:0;display:grid;place-items:center}
+.lb-menu .cc span{font-variant-numeric:tabular-nums;position:relative;top:-64px;white-space:pre;text-align:center}
+.lb-menu #wui{position:absolute;inset:0;z-index:20;pointer-events:none;font-family:var(--ui);-webkit-font-smoothing:antialiased}
+.lb-menu #wv1{position:absolute;inset:0;pointer-events:none;visibility:hidden;--f:0;--fo:clamp(0,calc(var(--f)*1.7 - .1),1);font-family:var(--ui);-webkit-font-smoothing:antialiased}
+.lb-menu #ec{position:absolute;inset:0;visibility:hidden;--c:0;--co:clamp(0,calc(var(--c)*1.8),1)}
+.lb-menu #ec:before{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(transparent calc(100% - 200px),rgba(0,0,0,.36));opacity:var(--c)}
+.lb-menu #cbtn,.lb-menu #plusm,.lb-menu #trash,.lb-menu .pb,.lb-menu #abtn{pointer-events:auto}
+.lb-menu:not([data-we="1"]) :is(#cbtn,#plusm,#trash),.lb-menu:not([data-we="2"]) :is(#ecn,#edn,#abtn,#cbox,#edt),.lb-menu .pop:not(.on){pointer-events:none!important}
+.lb-menu #ttl{opacity:var(--fo);position:absolute;left:0;right:0;top:64px;text-align:center;font:600 17px/22px var(--ui);letter-spacing:-.014em;color:rgba(255,255,255,.96);text-shadow:0 1px 12px rgba(0,0,0,.35);translate:0 calc((1 - var(--f))*-34px);scale:calc(.92 + .08*var(--f))}
+.lb-menu #pgd{opacity:var(--fo);position:absolute;left:0;right:0;top:672px;height:8px;display:flex;justify-content:center;align-items:center;gap:8px;translate:0 calc((1 - var(--f))*34px)}
+.lb-menu #pgd i,.lb-menu #sdt i{width:6px;height:6px;border-radius:3px;background:rgba(255,255,255,.32);transition:width .45s var(--ease),background .3s}
+.lb-menu #pgd i.on,.lb-menu #sdt i.on{width:18px;background:#fff}
+.lb-menu .pb,.lb-menu #abtn{background:var(--glass);-webkit-backdrop-filter:blur(28px) saturate(1.8);backdrop-filter:blur(28px) saturate(1.8);box-shadow:var(--glass-edge),var(--glass-lift);color:rgba(255,255,255,.96);cursor:pointer;font-family:var(--ui)}
+/* Customize / + / trash: these three are only positioning, fade (--f, --nx) and disabled-state wrappers now; the look and the press
+   physics (swell on touch, squeeze on release) live in PressButton.svelte. Wrapper box = the button's resting box (48px tall). The glass (tint + blur) is PressButton's `glass` option. */
+.lb-menu #cbtn,.lb-menu #trash{position:absolute;top:698px;height:48px;translate:0 calc((1 - var(--f))*34px);scale:calc(.9 + .1*var(--f))}
+.lb-menu #cbtn{left:50%;width:183px;margin-left:-91.5px}
+/* + = the MorphingMenu. Own layer above the cards (z-index 8; #wv1 is below them), same box and same slide / scale-in as the other buttons, fade on the
+   morphing capsule (it has no backdrop blur, so an opacity on it costs nothing). visibility is set from LockScreenEditor.renderE. */
+.lb-menu #plusm{position:absolute;left:1262px;top:698px;width:48px;height:48px;z-index:8;visibility:hidden;--f:0;--fo:clamp(0,calc(var(--f)*1.7 - .1),1);translate:0 calc((1 - var(--f))*34px);scale:calc(.9 + .1*var(--f))}
+.lb-menu #plusm .morph{opacity:var(--fo)}
+.lb-menu #trash{left:528.5px;width:48px}
+.lb-menu .pbt-ico{width:22px;height:22px;left:13px;top:13px;stroke-width:1.9}
+.lb-menu .pbt-label{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font:500 17px/1 var(--ui);letter-spacing:-.005em;white-space:nowrap}
+.lb-menu #cbtn.nx,.lb-menu #trash.nx{pointer-events:none}
+/* Fade and disabled dimming sit on the glass cap itself, never on the wrapper: an ancestor with opacity < 1 would switch the cap's
+   backdrop-filter off. --nx is registered with inherits:false, so it is set on the cap, not inherited from the wrapper. */
+.lb-menu :is(#cbtn,#trash) .cap{opacity:calc(var(--fo)*var(--nx));transition:--nx .3s}
+.lb-menu #trash.dis .cap{--nx:.4}
+.lb-menu :is(#cbtn,#trash).nx .cap{--nx:0}
+.lb-menu .pb{position:absolute;top:14px;height:34px;padding:0 16px;border-radius:17px;font-size:15px;line-height:34px;font-weight:500;letter-spacing:-.012em;will-change:scale}
+/* swell / squeeze / brightness come from the spring action (pressPhysics.ts), same physics as the trash / Customize buttons */
+.lb-menu .pb>[data-press-label]{display:block}
+.lb-menu #ecn{left:20px}
+.lb-menu #edn{right:20px;font-weight:600;background:rgba(255,255,255,.94);color:#14141a;box-shadow:inset 0 1px 0 #fff,var(--glass-lift)}
+.lb-menu #ecn,.lb-menu #edn,.lb-menu #edt,.lb-menu #sn,.lb-menu #sdt,.lb-menu #abtn{opacity:var(--co)}
+.lb-menu #ecn,.lb-menu #edn,.lb-menu #edt{translate:0 calc((1 - var(--c))*-110px)}
+.lb-menu #sn,.lb-menu #sdt,.lb-menu #abtn{translate:0 calc((1 - var(--c))*110px)}
+.lb-menu .ln{border:1px solid rgba(255,255,255,.7);box-shadow:0 0 0 1px rgba(0,0,0,.1),0 0 30px rgba(255,255,255,.06)}
+.lb-menu #edt{position:absolute;left:calc(50% + var(--dxo,0px));top:calc(77px + var(--dyo,0px) - var(--dh,39px)/2);width:var(--dw,390px);height:var(--dh,39px);margin-left:calc(var(--dw,390px)/-2);border-radius:19px;pointer-events:auto;cursor:grab;will-change:translate;transition:border-color .2s,box-shadow .3s}
+.lb-menu #edt.hid{border-style:dashed;border-color:rgba(255,255,255,.4);box-shadow:none}
+.lb-menu #edt.hid:after{content:"Add Date";position:absolute;inset:0;display:grid;place-items:center;font:500 14px var(--ui);color:rgba(255,255,255,.7)}
+.lb-menu .pop .dcn{transition:opacity .25s}
+.lb-menu .pop .dcn.off{opacity:.35;pointer-events:none}
+.lb-menu #edt.rs{border-color:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.12),0 0 28px rgba(255,255,255,.16);cursor:grabbing}
+.lb-menu #sn{position:absolute;left:0;right:0;bottom:76px;text-align:center;font:600 16px/20px var(--ui);letter-spacing:-.012em;color:#fff;text-shadow:0 1px 12px rgba(0,0,0,.4)}
+.lb-menu #sdt{position:absolute;left:0;right:0;bottom:52px;height:8px;display:flex;justify-content:center;align-items:center;gap:8px}
+.lb-menu #abtn{top:auto;right:24px;bottom:28px;width:40px;height:40px;padding:0;border-radius:50%;display:grid;place-items:center}
+.lb-menu #abtn svg{width:22px;height:22px}
+.lb-menu #cbox{position:absolute;left:0;top:0;display:none;border:1px solid rgba(255,255,255,.72);border-radius:15px;box-shadow:0 0 0 1px rgba(0,0,0,.1);cursor:grab;z-index:9;pointer-events:auto;will-change:translate;transition:translate .3s var(--ease),width .3s var(--ease),height .3s var(--ease),border-color .2s,box-shadow .3s}
+.lb-menu #cbox.nt{transition:none}
+.lb-menu #cbox.rs{transition:border-color .2s,box-shadow .3s;border-color:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.12),0 0 28px rgba(255,255,255,.16);cursor:grabbing}
+.lb-menu #cbox .rz{position:absolute;right:-18px;bottom:-18px;width:40px;height:40px;cursor:nwse-resize}
+.lb-menu #cbox .rz svg{width:100%;height:100%;pointer-events:none;filter:drop-shadow(0 1px 2px rgba(0,0,0,.35));transition:transform .3s var(--spring)}
+.lb-menu #cbox .rz:active svg{transform:scale(1.15)}
+.lb-menu #gx,.lb-menu #gy{position:absolute;pointer-events:none;opacity:0;transition:opacity .18s}
+.lb-menu #gx{left:683px;top:0;width:1px;height:768px;background:linear-gradient(rgba(255,214,10,0),rgba(255,214,10,.95) 16%,rgba(255,214,10,.95) 84%,rgba(255,214,10,0))}
+.lb-menu #gy{left:0;top:0;width:1366px;height:1px;background:linear-gradient(90deg,rgba(255,214,10,0),rgba(255,214,10,.95) 16%,rgba(255,214,10,.95) 84%,rgba(255,214,10,0))}
+.lb-menu #gx.on,.lb-menu #gy.on{opacity:1}
+/* Closed: a speck at the arrow tip (--ox/--oy), blurred and clear. Closing is the same way back, quick; opening springs out of it (.on). */
+.lb-menu .pop{position:absolute;z-index:30;width:340px;padding:18px 20px 20px;border-radius:28px;background:rgba(34,36,46,.88);-webkit-backdrop-filter:blur(46px) saturate(1.8);backdrop-filter:blur(46px) saturate(1.8);box-shadow:inset 0 0 0 1px rgba(255,255,255,.09),inset 0 1px 0 rgba(255,255,255,.14),0 2px 8px rgba(0,0,0,.28),0 26px 70px rgba(0,0,0,.45);font:500 14px var(--ui);letter-spacing:-.008em;-webkit-font-smoothing:antialiased;touch-action:none;opacity:0;visibility:hidden;transform:scale(.12);filter:blur(10px);transform-origin:var(--ox,0) var(--oy,40%);transition:opacity .13s ease-in,filter .2s ease-in,transform .2s cubic-bezier(.5,0,.9,.55),visibility 0s .2s}
+.lb-menu .pop.on{opacity:1;visibility:visible;transform:none;filter:none;transition:opacity .15s ease-out,filter .2s ease-out,transform .41s var(--pop-spring);transition-delay:0s}
+.lb-menu .pop:before{content:"";position:absolute;left:-10px;top:var(--ay,60px);width:11px;height:22px;margin-top:-11px;background:inherit;clip-path:polygon(100% 0,0 50%,100% 100%);display:var(--ad,block)}
+/* arrow on the right edge (the popover sits to the left of what it points at) */
+.lb-menu .pop.ar:before{left:auto;right:-10px;clip-path:polygon(0 0,100% 50%,0 100%)}
+.lb-menu .pop.na:before{display:none}
+.lb-menu #pC{z-index:31}
+.lb-menu :is(.pop,.npn) input{font-family:inherit;-webkit-user-select:text;user-select:text}
+.lb-menu .ph{display:flex;align-items:center;justify-content:space-between;height:30px;margin-bottom:12px}
+.lb-menu .ph b{font-size:16px;font-weight:600;letter-spacing:-.012em}
+.lb-menu .ib{width:28px;height:28px;display:grid;place-items:center;border-radius:50%;cursor:pointer;transition:background .25s,transform .25s var(--spring)}
+.lb-menu .ib:active{transform:scale(.9)}
+.lb-menu .ib svg{width:18px;height:18px}
+.lb-menu .ib.on{background:rgba(255,255,255,.2)}
+.lb-menu .fr{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.lb-menu .fo{height:44px;border-radius:12px;display:grid;place-items:center;font-size:24px;overflow:hidden;white-space:nowrap;font-weight:500;line-height:1;cursor:pointer;background:rgba(255,255,255,.05);transition:background .25s,box-shadow .25s,transform .25s var(--spring)}
+.lb-menu .fo:active{transform:scale(.93)}
+.lb-menu .fo.on{background:rgba(255,255,255,.15);box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.5)}
+/* sliders are the shared spring slider (src/components/Slider.svelte): a white fill and white pill on the glass. A track with a gradient (colour channels, brightness, opacity) is passed as `track`. */
+.lb-menu :is(.pop,.npn){--sl-track:rgba(255,255,255,.2);--sl-fill:rgba(255,255,255,.92);--sl-focus:#fff}
+.lb-menu :is(.pop,.npn) .slw{margin:6px 0}
+/* popover sliders: a slim track and a white pill to hold (the fill stops at the middle of the pill: 38px wide) */
+.lb-menu .xr{display:grid;grid-template-rows:0fr;opacity:0;transition:grid-template-rows .42s var(--ease),opacity .3s}
+/* the padding (cancelled by the negative margin) gives a slider thumb room to swell past the track end, and above / below the track, without being cropped */
+.lb-menu .xr>div{min-height:0;overflow:hidden;padding:12px;margin:-12px}
+.lb-menu .xr.on{grid-template-rows:1fr;opacity:1}
+.lb-menu .sq{position:relative;z-index:1;display:grid;grid-template-columns:repeat(6,1fr);gap:14px 0;justify-items:center;padding:16px 0 8px;margin-top:8px;border-top:1px solid rgba(255,255,255,.08)}
+.lb-menu .sq i{position:relative;width:32px;height:32px;border-radius:50%;cursor:pointer;box-shadow:inset 0 0 0 1px rgba(255,255,255,.18);transition:transform .25s var(--spring)}
+.lb-menu .sq i:active{transform:scale(.88)}
+.lb-menu .sq i:after{content:"";position:absolute;inset:-4px;border-radius:50%;border:1.5px solid #fff;opacity:0;scale:.82;transition:opacity .2s,scale .4s var(--spring)}
+.lb-menu .sq i.on:after{opacity:1;scale:1}
+.lb-menu .sg{position:relative;display:flex;padding:3px;gap:2px;background:rgba(0,0,0,.28);box-shadow:inset 0 1px 2px rgba(0,0,0,.22)}
+.lb-menu .sg{border-radius:11px}
+.lb-menu .sg>u{position:absolute;left:3px;top:3px;bottom:3px;width:calc((100% - 6px - (var(--n) - 1)*2px)/var(--n));border-radius:8px;background:rgba(255,255,255,.2);box-shadow:0 1px 3px rgba(0,0,0,.22),inset 0 1px 0 rgba(255,255,255,.14);transform:translateX(calc(var(--i,0)*(100% + 2px)));transition:transform .45s var(--ease);text-decoration:none}
+.lb-menu .sg b{position:relative;z-index:1;flex:1;text-align:center;cursor:pointer;white-space:nowrap;font-weight:500;color:rgba(255,255,255,.58);transition:color .25s}
+.lb-menu .sg b{padding:5px 6px;border-radius:8px;font-size:13px}
+.lb-menu .sg b.on{color:#fff}
+/* in a popover the control is flat: a faint track and a soft pill that slides, no recess */
+.lb-menu .pop .sg{padding:3px;gap:0;border-radius:999px;background:rgba(255,255,255,.06);box-shadow:none}
+.lb-menu .pop .sg>u{border-radius:999px;background:rgba(255,255,255,.16);box-shadow:inset 0 0 0 .5px rgba(255,255,255,.1)}
+.lb-menu .pop .sg b{padding:6px 8px;border-radius:999px}
+.lb-menu .tb{margin-bottom:12px}
+.lb-menu .cb{height:236px}
+.lb-menu .gd{display:grid;grid-template-columns:repeat(12,1fr);grid-auto-rows:1fr;gap:2px;height:230px;border-radius:14px;overflow:hidden}
+.lb-menu .gd i{display:block;cursor:pointer}
+.lb-menu .spc{position:relative;height:230px;border-radius:16px;touch-action:none;cursor:crosshair;background:linear-gradient(90deg,#fff,rgba(255,255,255,0) 50%,rgba(0,0,0,0) 50%,#000),linear-gradient(180deg,#f00,#ff0 17%,#0f0 33%,#0ff 50%,#00f 67%,#f0f 83%,#f00)}
+.lb-menu .spc b{position:absolute;width:16px;height:16px;margin:-8px;border-radius:50%;box-shadow:0 0 0 2px #fff,0 1px 6px rgba(0,0,0,.5);pointer-events:none}
+.lb-menu .rl{font-size:12px;font-weight:500;color:rgba(255,255,255,.58);margin-top:6px}
+.lb-menu .pop .rr.dis{pointer-events:none}
+.lb-menu .pop .rr.dis output{opacity:.4}
+.lb-menu .pop .fs .rl{margin-top:10px}
+.lb-menu .rr{display:flex;align-items:center;gap:12px}
+.lb-menu .rr input{flex:1}
+.lb-menu .rr output{width:48px;text-align:center;padding:6px 0;border-radius:9px;background:rgba(0,0,0,.3);font-variant-numeric:tabular-nums;font-size:13px}
+.lb-menu .hx{display:flex;align-items:center;justify-content:flex-end;gap:12px;margin-top:8px;color:#4f9bff;font-size:13px}
+.lb-menu .hx input{width:84px;padding:6px 0;text-align:center;border-radius:9px;background:rgba(0,0,0,.3);border:0;color:#fff;font:500 13px var(--ui);outline:none}
+.lb-menu .bt2{display:flex;align-items:center;gap:10px;margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.08)}
+.lb-menu .fvs{display:contents}
+.lb-menu .bt2 i{width:46px;height:46px;border-radius:50%;flex:none;box-shadow:inset 0 0 0 1px rgba(255,255,255,.15)}
+.lb-menu .bt2 i.fv{width:30px;height:30px;border-radius:50%;cursor:pointer;transition:transform .25s var(--spring)}
+.lb-menu .bt2 i.fv:active{transform:scale(.88)}
+.lb-menu .ad{width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.85);color:#2c2e38;display:grid;place-items:center;font:600 20px/1 var(--ui);cursor:pointer;will-change:scale}
+.lb-menu .rw2{display:flex;align-items:center;gap:10px;margin-top:12px}
+.lb-menu .rw2>span{width:76px;flex:none;color:rgba(255,255,255,.58);font-size:13px}
+.lb-menu .rw2 .sg{flex:1;min-width:0}
+.lb-menu .bt{flex:1;text-align:center;padding:9px 12px;border-radius:13px;background:rgba(255,255,255,.12);box-shadow:inset 0 1px 0 rgba(255,255,255,.08);font-weight:500;cursor:pointer;transition:transform .25s var(--spring),background .2s}
+.lb-menu .bt:active{transform:scale(.96);background:rgba(255,255,255,.18)}
+.lb-menu .pv{display:flex;gap:12px;justify-content:center;padding:14px;border-radius:18px;background:linear-gradient(135deg,#6a55b5,#2f4fb8);box-shadow:inset 0 0 0 1px rgba(255,255,255,.12)}
+.lb-menu .pv .ic{width:54px;height:54px;border-radius:13px;cursor:default}
+@media (prefers-reduced-motion:reduce){.lb-menu .pop,.lb-menu #pgd i,.lb-menu #sdt i,.lb-menu .xr,.lb-menu .sg>u{transition-duration:.01s!important}}
+.lb-menu #nsc{position:absolute;inset:0;z-index:34;background:rgba(8,9,14,.34);-webkit-backdrop-filter:blur(30px) saturate(1.25);backdrop-filter:blur(30px) saturate(1.25);opacity:0;visibility:hidden;pointer-events:none}
+.lb-menu #nwin{z-index:36;background:#1d1f27;font-family:var(--ui);-webkit-font-smoothing:antialiased;color:#fff}
+.lb-menu #nedit{background:none}
+.lb-menu #nwin:not([data-p="e"]) #nedit{pointer-events:none}
+/* "Delete this theme permanently?" sheet (DeleteSheet.svelte). It flies in / out with translate (Web Animations), so nothing here sets a transform or an
+   opacity on the panel itself (the glass buttons inside need their backdrop blur). The scrim is the same look as #nsc. */
+.lb-menu .dsw{position:absolute;inset:0;display:none;pointer-events:none;font-family:var(--ui);-webkit-font-smoothing:antialiased;color:#fff}
+.lb-menu .dsc{position:absolute;inset:0;z-index:34;background:rgba(8,9,14,.34);-webkit-backdrop-filter:blur(30px) saturate(1.25);backdrop-filter:blur(30px) saturate(1.25);pointer-events:none}
+.lb-menu .dsh{position:absolute;inset:0;margin:auto;z-index:36;width:500px;height:418px;padding:26px 24px;border-radius:34px;background:#1d1f27;box-shadow:0 14px 50px rgba(0,0,0,.45),inset 0 0 0 1px rgba(255,255,255,.08);pointer-events:none;will-change:translate}
+.lb-menu .dsw[data-open="1"] :is(.dsc,.dsh){pointer-events:auto}
+.lb-menu .dst{text-align:center;font:600 18px/24px var(--ui);letter-spacing:-.014em;color:rgba(255,255,255,.96)}
+/* 452 / 1366 = .330893: the preview is the full 1366x768 lock screen scaled down, so wallpaper and clock keep their exact relative layout */
+.lb-menu .dpv{position:relative;width:452px;height:254.2px;margin:18px auto 0;border-radius:18px;overflow:hidden;background:#0c0c0e;box-shadow:0 6px 20px rgba(0,0,0,.4)}
+.lb-menu .dpv:after{content:"";position:absolute;inset:0;border-radius:inherit;box-shadow:var(--card-ring);pointer-events:none}
+.lb-menu .dpi{position:absolute;left:0;top:0;width:1366px;height:768px;transform-origin:0 0;transform:scale(.330893)}
+.lb-menu .dsb{display:flex;justify-content:center;gap:14px;height:48px;margin-top:22px}
+.lb-menu #nedit{overflow:hidden}
+.lb-menu #npv{position:absolute;inset:0;background:#6a5cff}
+.lb-menu .nsd{position:absolute;inset:0;background:linear-gradient(transparent 38%,rgba(0,0,0,.32));pointer-events:none}
+.lb-menu #ntd{position:absolute;left:0;right:0;top:112px;text-align:center;font:600 22px/22px var(--ui);color:rgba(255,255,255,.93);text-shadow:0 2px 14px rgba(0,0,0,.22);pointer-events:none}
+.lb-menu #ntt{position:absolute;left:0;right:0;top:136px;text-align:center;font:200 150px/1 "Inter Variable",Inter,sans-serif;letter-spacing:-4px;font-variant-numeric:tabular-nums;white-space:pre;color:rgba(255,255,255,.93);text-shadow:0 4px 40px rgba(0,0,0,.22);pointer-events:none}
+.lb-menu .nb{position:absolute;top:28px;height:36px;padding:0 18px;border-radius:18px;font:500 16px/36px var(--ui);letter-spacing:-.012em;cursor:pointer;color:rgba(255,255,255,.96);background:var(--glass);-webkit-backdrop-filter:blur(28px) saturate(1.8);backdrop-filter:blur(28px) saturate(1.8);box-shadow:var(--glass-edge),var(--glass-lift);will-change:scale}
+.lb-menu .nb>[data-press-label]{display:block}
+.lb-menu #nbc{left:30px}
+.lb-menu #nba{right:30px;font-weight:600;background:rgba(255,255,255,.94);color:#14141a;box-shadow:inset 0 1px 0 #fff,var(--glass-lift)}
+.lb-menu #nbt{position:absolute;top:28px;left:0;right:0;text-align:center;font:600 17px/36px var(--ui);letter-spacing:-.014em;text-shadow:0 1px 12px rgba(0,0,0,.35);pointer-events:none}
+.lb-menu .npn{position:absolute;left:303px;bottom:28px;width:760px;height:352px;padding:20px 22px;border-radius:34px;background:rgba(28,30,40,.5);-webkit-backdrop-filter:blur(40px) saturate(1.7);backdrop-filter:blur(40px) saturate(1.7);box-shadow:var(--glass-edge),0 24px 60px rgba(0,0,0,.35)}
+.lb-menu .nmd{width:240px;margin:0 auto 16px}
+.lb-menu .nmd b{padding:7px 6px;font-size:14px}
+.lb-menu .nbd{display:flex;gap:24px;height:262px}
+.lb-menu .nlc{width:250px;flex:none}
+.lb-menu .npk{flex:1;min-width:0}
+.lb-menu .nst{display:flex;align-items:center;gap:14px;height:68px;padding:0 14px;border-radius:20px;background:rgba(255,255,255,.07);box-shadow:inset 0 0 0 1px rgba(255,255,255,.06);cursor:pointer;transition:box-shadow .25s,background .25s,transform .25s var(--spring)}
+.lb-menu .nst:active{transform:scale(.98)}
+.lb-menu .nst.on{background:rgba(255,255,255,.12);box-shadow:inset 0 0 0 2px rgba(255,255,255,.9)}
+.lb-menu .nst>i{width:44px;height:44px;border-radius:13px;flex:none;box-shadow:inset 0 0 0 1px rgba(255,255,255,.2)}
+.lb-menu .nst span{display:block;font:500 12px/16px var(--ui);color:rgba(255,255,255,.58)}
+.lb-menu .nst b{display:block;font:600 16px/20px var(--ui);letter-spacing:.02em;font-variant-numeric:tabular-nums}
+.lb-menu #ngx .nst{margin-top:10px}
+.lb-menu .nan{margin-top:12px}
+.lb-menu .nan .rl{margin-top:0}
+.lb-menu .ncp{margin-top:14px;font:500 13px/18px var(--ui);color:rgba(255,255,255,.5);transition:opacity .25s}
+.lb-menu #nedit.ngr .ncp{opacity:0}
+.lb-menu .npk .cb{height:170px}
+.lb-menu .npk .gd,.lb-menu .npk .spc{height:170px}
+.lb-menu .nsr{height:48px}
+.lb-menu .nsr .rl{width:44px;margin:0;flex:none}
+.lb-menu .nft{display:flex;align-items:center;gap:10px;margin-top:12px;height:36px}
+.lb-menu .nhx{display:flex;align-items:center;gap:6px;color:#4f9bff;font-size:13px}
+.lb-menu .nhi{width:84px;padding:6px 0;text-align:center;border-radius:9px;background:rgba(0,0,0,.3);border:0;color:#fff;font:500 13px var(--ui);outline:none}
+.lb-menu .nft i.fv{width:28px;height:28px;border-radius:9px;flex:none;cursor:pointer;box-shadow:inset 0 0 0 1px rgba(255,255,255,.15);transition:transform .25s var(--spring)}
+.lb-menu .nft i.fv:active{transform:scale(.88)}
+/* ===== additions for the Svelte port ===== */
+/* the backdrop and the carousel controls sit BEHIND the live screen (shrinking it uncovers them); they are rendered after it, so push them down */
+.lb-menu #wbg,.lb-menu #wv1{z-index:-1}
+/* the New Lock Screen window shares the app-window base styles */
+.lb-menu #nwin{position:absolute;left:0;top:0;overflow:hidden;display:none;box-shadow:0 14px 50px rgba(0,0,0,.45),inset 0 0 0 1px rgba(255,255,255,.08);will-change:transform;contain:layout style}
+.lb-menu #nwin .ct{position:absolute;left:0;top:0;transform-origin:0 0}
+/* dock-icon preview plates (same tokens as the dock itself) */
+.lb-menu .pv .ic{position:relative;box-shadow:inset 0 0 0 1px rgba(255,255,255,.07),0 1px 3px rgba(0,0,0,.25);background:var(--pl,linear-gradient(#1f1f21,#0c0c0d))}
+.lb-menu .pv .g{position:absolute;inset:0;filter:var(--gf,none)}
+.lb-menu .pv .g svg{width:100%;height:100%;display:block}
+.lb-menu .pv[data-m]{--pl:linear-gradient(#1f1f21,#0c0c0d);--gf:none}
+.lb-menu .pv[data-a="l"]{--pl:linear-gradient(#fbfbfd,#d9d9df)}
+.lb-menu .pv[data-a="l"][data-m="def"] .ic[data-k="st"] .g{filter:brightness(.6)}
+.lb-menu .pv[data-m="tnt"]{--pl:linear-gradient(var(--tc),color-mix(in srgb,var(--tc) 70%,#000));--gf:grayscale(1) brightness(10)}
+.lb-menu .pv[data-m="tnt"][data-a="d"]{--pl:linear-gradient(color-mix(in srgb,var(--tc) 40%,#000),color-mix(in srgb,var(--tc) 22%,#000));--gf:grayscale(1) brightness(1.5)}
+.lb-menu .pv[data-m="tnt"][data-a="l"][data-l="1"]{--gf:grayscale(1) brightness(0) opacity(.82)}
+/* every editor control is a plain element: no text selection, no native tap highlight */
+.lb-menu .pop,.lb-menu #wui,.lb-menu #wv1,.lb-menu #nwin{-webkit-tap-highlight-color:transparent}

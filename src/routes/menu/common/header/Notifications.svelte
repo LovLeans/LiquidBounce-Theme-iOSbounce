@@ -1,115 +1,72 @@
 <script lang="ts">
     import {fly} from "svelte/transition";
     import {notification, type TNotification} from "./notification_store";
-    import {onMount, tick} from "svelte";
+    import {onMount} from "svelte";
 
-    let current: TNotification | null = null;
-    let pending: TNotification | null = null;
-    let visible = false;
-    let leaving = false;
-    let mounted = false;
-    let dismissTimeout: ReturnType<typeof setTimeout> | undefined;
-
-    function showPending() {
-        if (!mounted) {
-            return;
-        }
-
-        current = pending;
-        pending = null;
-        leaving = false;
-        visible = current !== null;
+    interface NotificationWithId {
+        notification: TNotification;
+        id: number;
     }
 
-    async function hideCurrent() {
-        clearTimeout(dismissTimeout);
-        if (leaving || !current) {
-            return;
-        }
-
-        leaving = true;
-        await tick();
-        if (mounted) {
-            visible = false;
-        }
-    }
-
-    function scheduleDismiss() {
-        if (!mounted || leaving || !visible || !current) {
-            return;
-        }
-
-        dismissTimeout = setTimeout(hideCurrent, (current.delay ?? 3) * 1000);
-    }
+    let notifications: NotificationWithId[] = [];
+    let nextId = 0;
 
     onMount(() => {
-        mounted = true;
-        const unsubscribe = notification.subscribe((value) => {
-            if (!value) {
-                return;
-            }
+       notifications = [];
+    });
 
-            pending = {...value};
-            notification.set(null);
-
-            if (current) {
-                hideCurrent();
-            } else {
-                showPending();
-            }
-        });
-
-        return () => {
-            mounted = false;
-            unsubscribe();
-            clearTimeout(dismissTimeout);
+    notification.subscribe((v) => {
+        if (!v) {
+            return;
+        }
+        const id = ++nextId; // was Date.now(): two in the same millisecond shared a key and were removed together
+        const n = {
+            notification: v,
+            id
         };
+        notifications = [...notifications, n];
+        setTimeout(() => {
+            notifications = notifications.filter(n => n.id !== id);
+        }, (v?.delay ?? 3) * 1000);
     });
 </script>
 
 <div class="notifications">
-    {#if visible && current}
-        <div class="notification"
-             transition:fly|global={{duration: 500, y: -100}}
-             on:introend={scheduleDismiss}
-             on:outroend={showPending}>
-            <div class="icon" class:error={current.error}>
+    {#each notifications as n (n.id)}
+        <div class="notification" transition:fly|global={{duration: 500, y: -100}}>
+            <div class="icon" class:error={n.notification.error}>
                 <img src="img/hud/notification/icon-info.svg" alt="info">
             </div>
-            <div class="title">{current.title}</div>
-            <div class="message">{current.message}</div>
+            <div class="title">{n.notification.title}</div>
+            <div class="message">{n.notification.message}</div>
         </div>
-    {/if}
+    {/each}
 </div>
 
 <style lang="scss">
+
   .notifications {
-    position: relative;
-    min-width: 350px;
+    display: grid;
+    grid-template-columns: 1fr;
   }
 
   .notification {
-    position: relative;
-    width: 100%;
-    z-index: 1001;
-    box-sizing: border-box;
+    grid-row-start: 1;
+    grid-column-start: 1;
     background-color: var(--menu-header-notification-background-color);
     border-radius: 5px;
     display: grid;
     grid-template-areas:
         "a b"
         "a c";
-    grid-template-columns: max-content minmax(0, 1fr);
+    grid-template-columns: max-content 1fr;
     overflow: hidden;
     padding-right: 10px;
-
-    .title, .message {
-      overflow-wrap: anywhere;
-    }
+    min-width: 350px;
 
     .title {
       color: var(--menu-text-color);
-      font-weight: 500;
+      font-weight: 600;
       font-size: 18px;
       grid-area: b;
       align-self: flex-end;
@@ -123,7 +80,7 @@
 
     .icon {
       grid-area: a;
-      min-height: 65px;
+      height: 65px;
       width: 65px;
       background-color: var(--menu-header-notification-icon-background-color);
       display: flex;

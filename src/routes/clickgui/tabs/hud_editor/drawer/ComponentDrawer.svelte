@@ -4,7 +4,6 @@
     import {addComponent, getComponentCatalog, getMetadata} from "../../../../../integration/rest";
     import DrawerHudComponent from "./DrawerHudComponent.svelte";
     import {fly} from "svelte/transition";
-    import {escapeLayer} from "../../../../../integration/escape";
 
     let metadata: Metadata;
 
@@ -56,18 +55,12 @@
         drawerShown = false;
         query = "";
     }
-
-    const layer = escapeLayer(() => {
-        drawerShown = false;
-        query = "";
-    });
-    $effect(() => layer.setOpen(drawerShown));
 </script>
 
 <svelte:window onclick={handleWindowClick}/>
 
 <div class="component-drawer" bind:this={drawerElement}>
-    <button class="button-toggle-drawer" onclick={toggleDrawer} transition:fly={{duration: 200, y: -10}}>Add Component</button>
+    <button class="button-toggle-drawer" onclick={toggleDrawer}>Add Component</button>
 
     {#if drawerShown}
         <div class="drawer" transition:fly={{ y: -10, duration: 200 }}>

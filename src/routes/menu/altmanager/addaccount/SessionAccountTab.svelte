@@ -1,25 +1,33 @@
+<!-- Add Account > Session: an account from a session (access) token. -->
 <script lang="ts">
-    import Tab from "../../common/modal/Tab.svelte";
-    import IconTextInput from "../../common/setting/IconTextInput.svelte";
-    import ButtonSetting from "../../common/setting/ButtonSetting.svelte";
+    import IosPane from "../../ios/IosPane.svelte";
+    import IosField from "../../ios/IosField.svelte";
+    import IosButton from "../../ios/IosButton.svelte";
     import {addSessionAccount} from "../../../../integration/rest";
 
-    let token = "";
-    $: disabled = validateSessionId(token);
-
-    function validateSessionId(token: string): boolean {
-        return token.length === 0;
+    interface Props {
+        busy: boolean;
+        run: (job: () => Promise<unknown>, watchdogMs?: number) => void;
     }
 
-    async function addAccount() {
-        if (disabled) {
-            return;
+    let {busy, run}: Props = $props();
+
+    let token = $state("");
+
+    const disabled = $derived(busy || token.trim().length === 0);
+
+    function add() {
+        if (!disabled) {
+            run(() => addSessionAccount(token.trim()));
         }
-        await addSessionAccount(token);
     }
 </script>
 
-<Tab>
-    <IconTextInput icon="user" title="Session ID" bind:value={token}/>
-    <ButtonSetting title="Add Account" {disabled} on:click={addAccount} listenForEnter={true} inset={true} />
-</Tab>
+<IosPane>
+    <IosField label="Session ID" placeholder="Session token" bind:value={token} onenter={add}/>
+    <p class="hint">Adds the account the session token belongs to.</p>
+
+    {#snippet actions()}
+        <IosButton variant="primary" {disabled} onclick={add}>{busy ? "Adding…" : "Add Account"}</IosButton>
+    {/snippet}
+</IosPane>

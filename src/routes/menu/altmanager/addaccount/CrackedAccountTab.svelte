@@ -1,27 +1,42 @@
+<!-- Add Account > Cracked: an offline account. A random name is one tap away. -->
 <script lang="ts">
-    import Tab from "../../common/modal/Tab.svelte";
-    import IconTextInput from "../../common/setting/IconTextInput.svelte";
-    import ButtonSetting from "../../common/setting/ButtonSetting.svelte";
-    import {addCrackedAccount, randomUsername} from "../../../../integration/rest";
-    import IconButton from "../../common/buttons/IconButton.svelte";
-    import SwitchSetting from "../../common/setting/SwitchSetting.svelte";
+    import IosPane from "../../ios/IosPane.svelte";
+    import IosField from "../../ios/IosField.svelte";
+    import IosToggleRow from "../../ios/IosToggleRow.svelte";
+    import IosRandomButton from "../../ios/IosRandomButton.svelte";
+    import IosButton from "../../ios/IosButton.svelte";
+    import {addCrackedAccount} from "../../../../integration/rest";
+    import {generateUsername} from "../../../../util/random_username";
 
-    let username = "";
-    let online = false;
-
-    async function addAccount() {
-        await addCrackedAccount(username, online);
+    interface Props {
+        busy: boolean;
+        run: (job: () => Promise<unknown>, watchdogMs?: number) => void;
     }
 
-    async function generateRandomUsername() {
-        username = await randomUsername();
+    let {busy, run}: Props = $props();
+
+    let username = $state("");
+    let online = $state(false);
+
+    const disabled = $derived(busy || username.trim().length === 0);
+
+    function add() {
+        if (!disabled) {
+            run(() => addCrackedAccount(username.trim(), online));
+        }
     }
 </script>
 
-<Tab>
-    <IconTextInput icon="user" title="Username" bind:value={username} maxLength={16}>
-        <IconButton icon="random" title="Random" on:click={generateRandomUsername}/>
-    </IconTextInput>
-    <SwitchSetting title="Use online UUID" bind:value={online}/>
-    <ButtonSetting title="Add Account" on:click={addAccount} listenForEnter={true} inset={true}/>
-</Tab>
+<IosPane>
+    <IosField label="Username" placeholder="Steve" maxlength={16} bind:value={username} onenter={add}>
+        {#snippet trailing()}
+            <IosRandomButton onclick={() => (username = generateUsername())}/>
+        {/snippet}
+    </IosField>
+    <IosToggleRow label="Use online UUID" bind:value={online}/>
+    <p class="hint">An offline account: no password, any name. Online UUID gives the name's real skin and UUID.</p>
+
+    {#snippet actions()}
+        <IosButton variant="primary" {disabled} onclick={add}>{busy ? "Adding…" : "Add Account"}</IosButton>
+    {/snippet}
+</IosPane>
