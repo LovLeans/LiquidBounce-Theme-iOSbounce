@@ -20,6 +20,7 @@
   import { clamp01 } from '../lib/morph.js';
   import { createPageMorph } from '../lib/pageMorph.js';
   import { spaced, soft } from './settings/util.js';
+  import { stage } from '../lib/stage.svelte';
   import Setting from './settings/Setting.svelte';
 
   // The window's visibility is the number `--in` (0..1), never an `opacity` on the window: a parent with opacity < 1 stops the glass and
@@ -100,7 +101,7 @@
         {#if !tree}
           <p class="msg">{error ? `Could not load the settings: ${error}` : 'Loading…'}</p>
         {:else}
-          <div class="cols">
+          <div class="cols" class:one={stage.w < 760}>
             {#each columns as col, c (c)}
               <div class="col">
                 {#each col as sec (sec.name)}
@@ -128,7 +129,7 @@
      stayed on .win itself, the edge-blur layers would blur the window's own tint a second time and show up as a grey band.
      Visibility is `--in` on each layer separately, never an opacity on the window (see the script). */
   .win { --hh: 52px; /* header height: the list runs underneath it */ --fade: 48px; /* length of the edge-blur fade */
-    position: fixed; left: 50%; top: 66px; margin-left: calc(min(820px, 94vw) / -2); width: min(820px, 94vw); height: min(calc(100vh - 90px), 760px);
+    position: fixed; left: 50%; top: 66px; margin-left: calc(min(820px, var(--stage-w, 100vw) * .94) / -2); width: min(820px, calc(var(--stage-w, 100vw) * .94)); height: min(calc(var(--stage-h, 100vh) - 90px), 760px);
     border-radius: 26px; display: flex; flex-direction: column; overflow: hidden; z-index: 5; user-select: none; isolation: isolate;
     background: none; -webkit-backdrop-filter: none; backdrop-filter: none;
     border-color: color-mix(in srgb, var(--cg-stroke) calc(var(--in) * 100%), transparent);
@@ -181,5 +182,5 @@
   .pb .b3 { --s: calc(var(--o) * .75); --e: calc(var(--o) + var(--fade) * .72); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); }
   .pb .b2 { --s: calc(var(--o) * .90); --e: calc(var(--o) + var(--fade) * .90); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); }
   .pb .b1 { --s: var(--o);             --e: calc(var(--o) + var(--fade));       -webkit-backdrop-filter: blur(1px); backdrop-filter: blur(1px); }
-  @media (max-width: 760px) { .cols { grid-template-columns: 1fr; } }
+  .cols.one { grid-template-columns: 1fr; }   /* a narrow window (in design pixels, see lib/stage.svelte.ts) */
 </style>

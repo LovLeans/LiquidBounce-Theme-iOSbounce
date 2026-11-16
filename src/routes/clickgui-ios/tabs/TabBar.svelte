@@ -106,7 +106,7 @@
 
 <style>
   /* centred without a transform: left 50% and a negative margin of half the width */
-  .sw { position: fixed; left: 50%; top: 14px; z-index: 100001; width: calc(var(--n) * 96px + 8px); margin-left: calc(var(--n) * -48px - 4px); }
+  .sw { position: fixed; left: 50%; top: 14px; z-index: 100001; pointer-events: auto; /* its scaled layer (ClickGuiRoute) is passthrough */ width: calc(var(--n) * 96px + 8px); margin-left: calc(var(--n) * -48px - 4px); }
   .tabs { position: relative; width: 100%; padding: 4px; box-sizing: border-box; border-radius: 18px; user-select: none; touch-action: pan-y; }
   .tl, .fg { display: grid; grid-template-columns: repeat(var(--n), 1fr); }
   /* a copy of the labels with the same grid, clipped to the pill by the engine */

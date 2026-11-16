@@ -13,6 +13,7 @@
 <script lang="ts">
   import { onMount, tick as nextTick, untrack } from "svelte";
   import { scroller, scrollTo } from "../lib/scroller.js";
+  import { stage } from "../lib/stage.svelte";
   import { getMetadata, getComponentCatalog, addComponent } from "../../../integration/rest";
   import type { HudComponentCatalogEntry } from "../../../integration/types";
   import { reloadHud } from "../../hud/reload";
@@ -161,8 +162,9 @@
 
   // the pill never moves: the menu height is capped to the room below it
   function size(): [number, number] {
-    const top = morph.parentElement!.getBoundingClientRect().top;
-    return [Math.round(Math.min(MAXW, window.innerWidth - 24)), Math.round(Math.max(220, Math.min(MAXH, window.innerHeight - top - SHADOW_ROOM)))];
+    // everything here is in design pixels (lib/stage.svelte.ts): the window is stage.w x stage.h, the pill's top is a real-pixel measure
+    const top = morph.parentElement!.getBoundingClientRect().top / stage.s;
+    return [Math.round(Math.min(MAXW, stage.w - 24)), Math.round(Math.max(220, Math.min(MAXH, stage.h - top - SHADOW_ROOM)))];
   }
 
   function render() {
@@ -283,7 +285,8 @@
     return el && el.getAttribute("aria-disabled") !== "true" ? el : null;
   }
   function glow(e: PointerEvent) {
-    const r = list.getBoundingClientRect(), x = clamp(((e.clientX - r.left - PAD) / (r.width - 2 * PAD)) * 100, 0, 100);   // across the rows, not the margins
+    const r = list.getBoundingClientRect(), k = stage.s;   // the pointer and the rect are real pixels, PAD is a design pixel
+    const x = clamp(((e.clientX - r.left - PAD * k) / Math.max(1, r.width - 2 * PAD * k)) * 100, 0, 100);   // across the rows, not the margins
     if (ho.p < 0.05) { gx.p = gx.t = x; gx.v = 0; } else set(gx, x, 500, 40);
   }
   // `it.offsetTop` is measured in .inner (the box lib/scroller.js moves), so the pill scrolls with the rows by itself
@@ -314,7 +317,7 @@
     if (e.pointerType === "mouse") { mx = e.clientX; my = e.clientY; }
     if (e.pointerType !== "mouse" && !pressedItem) return;
     // a finger that moves is scrolling the list (the pointer stays captured by the pressed row, so "left the row" never happens)
-    if (pressedItem && e.pointerType !== "mouse" && Math.hypot(e.clientX - dx0, e.clientY - dy0) > 8) { endPress(); setHl(null); return; }
+    if (pressedItem && e.pointerType !== "mouse" && Math.hypot(e.clientX - dx0, e.clientY - dy0) > 8 * stage.s) { endPress(); setHl(null); return; }
     const it = itemEl(e.target);
     if (it) glow(e);
     if (pressedItem) { if (it !== pressedItem) { endPress(); setHl(null); } }   // dragged off the pressed row: let go of it
@@ -467,7 +470,7 @@
 
 <style>
   /* Above every component of the editor (their z-index comes from the client and grows each time one is brought to the front;
-     .hud-editor is its own stacking context). Absolute inside .hud-editor (fixed, inset 0): the pill's centre is 24px under the
+     .hud-editor is its own stacking context). Absolute inside the scaled layer of .hud-editor (lib/Stage.svelte: design pixels, so 84px is 84px at any resolution): the pill's centre is 24px under the
      64px line where the search bar of the ClickGUI page starts, below the tab bar (centre = 64 + H / 2). */
   .stage {
     position: absolute;
@@ -476,6 +479,7 @@
     z-index: 100000;
     width: 0;
     height: 0;
+    pointer-events: auto;   /* the layer around it (HudEditor.svelte, lib/Stage.svelte) is passthrough */
     box-sizing: border-box;
     -webkit-tap-highlight-color: transparent;
     user-select: none;

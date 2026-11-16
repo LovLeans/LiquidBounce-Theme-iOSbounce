@@ -49,6 +49,8 @@
     Default layout: rows with a gap (only for windows without a saved position). Windows never move by themselves: resizing the screen / windowed mode leaves them where they are.
     Windows start COLLAPSED the first time (set startCollapsed={false} to start open); after that the GUI reopens the way it was left.
     Expanding/collapsing a window plays a blur + fade + slide, like the settings drawer.
+    The GUI is laid out in a 1920x1080 design space that is scaled to the window and the GUI scale (lib/Stage.svelte, lib/stage.svelte.ts), so
+    positions are in design pixels and look the same at any resolution.
     Window positions are saved to localStorage under `storageKey`; which windows / module drawers are open under `<storageKey>:open`,
     guarded so it silently skips if storage is unavailable. Clear that key to reset positions.
     /  .................. focus search      Enter .... toggle first match
@@ -79,6 +81,7 @@
   import Panel from './Panel.svelte';
   import Search from './Search.svelte';
   import { flash, useOpenMemory, rememberedWindows, rememberWindows } from './stores.js';
+  import { stage } from './stage.svelte';
 
   let { categories = [], onToggle = () => {}, onSetting = () => {}, onTyping = () => {}, storageKey = 'ios-clickgui-layout', startCollapsed = true, onready = () => {}, active = true, swipe: swipeProp = null } = $props();   // active: false while another tab (HUD editor, settings) is shown: the windows leave like on closing
 
@@ -180,7 +183,8 @@
   useOpenMemory(storageKey);
   const wasOpen = rememberedWindows();
   function initial() {
-    const g = grid(innerWidth, innerHeight);
+    // laid out in design pixels (lib/stage.svelte.ts), so a window is in the same place at 1080p, 1440p and 4K
+    const g = grid(stage.w, stage.h);
     const d = Object.fromEntries(names.map((k, i) => [k, { x: g[i].x, y: g[i].y, z: i + 1, collapsed: wasOpen ? !wasOpen.has(k) : startCollapsed }]));
     try {
       const saved = JSON.parse(localStorage.getItem(storageKey) || 'null');
@@ -189,7 +193,9 @@
           const v = saved[k];
           if (!v) return;
           d[k].z = v.z ?? d[k].z;                                                   // collapsed is never restored
-          if (Number.isFinite(v.x) && Number.isFinite(v.y)) { d[k].x = v.x; d[k].y = v.y; }   // exactly where the user left it, whatever the screen size is now
+          // where the user left it. A window that is outside the screen now (a smaller window, a bigger GUI scale) is pulled back in
+          // when the GUI is built, so it cannot be lost; it is never moved after that.
+          if (Number.isFinite(v.x) && Number.isFinite(v.y)) { d[k].x = clampX(v.x, stage.w); d[k].y = clampY(v.y, stage.h); }
         });
       }
     } catch {}

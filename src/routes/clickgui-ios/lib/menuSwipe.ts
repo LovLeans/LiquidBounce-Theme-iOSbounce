@@ -1,3 +1,5 @@
+import { stage } from './stage.svelte';
+
 /**
  * Menu swipe animation: the "apps zoom in from the camera" physics, driving whole menus.
  *
@@ -266,11 +268,12 @@ export class MenuSwipe {
       dmax = Math.max(dmax, Math.hypot(a.dx, a.dy));
     }
     if (this.peer) dmax = Math.max(dmax, this.peer.reach());
-    if (this.reachFloor > 0 && typeof innerWidth === 'number') {
-      dmax = Math.max(dmax, this.reachFloor * Math.hypot(innerWidth / 2, innerHeight / 2));
+    // the UI is laid out in design pixels (lib/stage.svelte.ts), so the screen is `stage.w x stage.h` here, not the window's real size
+    if (this.reachFloor > 0) {
+      dmax = Math.max(dmax, this.reachFloor * Math.hypot(stage.w / 2, stage.h / 2));
     }
     const { spread, ripple, stretch, corner, maxSize, bounce } = this.cfg;
-    const vh = typeof innerHeight === 'number' && innerHeight > 0 ? innerHeight : 1080;
+    const vh = stage.h > 0 ? stage.h : 1080;
     for (const a of this.items) {
       const side = Math.max(a.el.offsetWidth, a.el.offsetHeight, 1);
       a.zoom = maxSize > 0 && bounce > 0 ? Math.max(0.02, Math.min(1, (maxSize * vh / side - 1) / bounce)) : 1;
@@ -326,8 +329,8 @@ export class MenuSwipe {
   private measure(el: HTMLElement): { dx: number; dy: number } {
     // a `position: fixed` item has no offsetParent: the viewport is its stage
     const parent = el.offsetParent as HTMLElement | null;
-    const cx = (parent ? parent.clientWidth : typeof innerWidth === 'number' ? innerWidth : 0) / 2;
-    const cy = (parent ? parent.clientHeight : typeof innerHeight === 'number' ? innerHeight : 0) / 2;
+    const cx = (parent ? parent.clientWidth : stage.w) / 2;
+    const cy = (parent ? parent.clientHeight : stage.h) / 2;
     return { dx: el.offsetLeft + el.offsetWidth / 2 - cx, dy: el.offsetTop + el.offsetHeight / 2 - cy };
   }
 

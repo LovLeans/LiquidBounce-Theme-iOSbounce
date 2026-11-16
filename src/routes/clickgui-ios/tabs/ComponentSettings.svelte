@@ -22,10 +22,12 @@
   import { rememberOptions, applyOptionsToTree } from '../../hud/options';
   import Setting from './settings/Setting.svelte';
   import { pressPhysics } from '../../menu/title/main-menu/pressPhysics';
+  import { stage } from '../lib/stage.svelte';
 
   let { name, id, alignment, onRemoved = undefined, overlayOffset = 0 } = $props();
 
-  const EDGE = 10; // keep this far from the screen edge
+  const EDGE = 10; // keep this far from the screen edge (in design pixels, lib/stage.svelte.ts)
+  const POP_W = 224; // the popover's width (.pop below)
 
   let el = $state();
   let cfg = $state(lastSettings.has(name) ? structuredClone(lastSettings.get(name)) : null);
@@ -62,11 +64,17 @@
       below = (r.top + r.height / 2 - scr.top) / scr.height < 0.5;
     }
     const b = el.getBoundingClientRect();
-    shiftX = b.right > scr.right - EDGE * k ? (scr.right - EDGE * k - b.right) / k
-      : b.left < scr.left + EDGE * k ? (scr.left + EDGE * k - b.left) / k : 0;
+    // The popover is drawn at the app's scale (--pop-k, below), inside the HUD's zoom: one of its own pixels is `ratio` screen pixels
+    // (app scale x the layer's scale right now), so the shift, which is in its own pixels, is divided by that.
+    const ratio = b.width / POP_W || 1;
+    const edge = EDGE * stage.s * k;
+    shiftX = b.right > scr.right - edge ? (scr.right - edge - b.right) / ratio
+      : b.left < scr.left + edge ? (scr.left + edge - b.left) / ratio : 0;
   }
   // the component moved (another alignment / offset): place the popover again
   $effect(() => { alignment.horizontalAlignment; alignment.horizontalOffset; alignment.verticalAlignment; alignment.verticalOffset; place(); });
+  // the app's scale changed (window resized, GUI scale): the popover's size changed with it
+  $effect(() => { stage.s; place(); });
   // opening / closing the settings changes the popover's size, which can push it over the edge
   $effect(() => { open; nested.length; place(); });
 
@@ -231,9 +239,12 @@
   /* above the component by default (its bottom edge 14px over the component's top), below it for components in the upper half of the screen.
      Anchored with bottom / top, NOT translateY(-100%): a percentage of the popover's own height changes on every frame of a drawer
      opening or closing, and with a transition on the transform the popover lagged behind and wobbled (the "glitch"). */
-  .wrap { position: absolute; left: 50%; bottom: calc(100% + 14px + var(--o)); z-index: 2; transform: translateX(-50%);
+  .wrap { position: absolute; left: 50%; bottom: calc(100% + 14px + var(--o)); z-index: 2;
+    /* --pop-k (set on .hud-editor): the app's scale relative to the HUD's own zoom, so the popover is as big as the rest of the app at any
+       resolution while the component under it keeps Minecraft's GUI scale. It grows from the edge that touches the component. */
+    transform: translateX(-50%) scale(var(--pop-k, 1)); transform-origin: 50% 100%;
     transition: bottom .28s cubic-bezier(.3, 1.1, .5, 1), top .28s cubic-bezier(.3, 1.1, .5, 1); }
-  .wrap.below { bottom: auto; top: calc(100% + 14px + var(--o)); }
+  .wrap.below { bottom: auto; top: calc(100% + 14px + var(--o)); transform-origin: 50% 0; }
   /* The glass (tint + backdrop blur) is on two layers BEHIND the content, as in the windows (Panel.svelte), not on .pop itself. The drawers
      inside animate their height AND a `filter: blur()`; with the backdrop blur on their own ancestor that made the popover flicker, which
      is why the blur had been taken off the drawers here. As siblings of the content the two do not interact, so the drawers can blur

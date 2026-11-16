@@ -29,6 +29,7 @@
   import { persistentDataLoaded, setItem } from '../../integration/persistent_storage';
   import { isTextEntry } from '../../util/utils';
   import { fontsLoaded, loadGuiFonts } from './lib/fonts.js';
+  import Stage from './lib/Stage.svelte';
   import TabBar from './tabs/TabBar.svelte';
   import HudEditor from './tabs/HudEditor.svelte';
   import GlobalSettings from './tabs/GlobalSettings.svelte';
@@ -115,25 +116,35 @@
 <!-- display: contents: no box of its own (nothing is covered or blocked), but the tokens, the font and the `.clickgui` rules
      (no backdrop blurs while a window carries the layer, button font, focus ring) reach the tabs -->
 <div class="clickgui cgx">
-  <!-- Only the module windows need the module data. The tab bar and the HUD editor / settings pages do not, so they are NOT
-       gated on `categories`: when the GUI is reopened on the HUD editor tab while the modules are still loading (or the load is slow
-       because a previous, abandoned load is still being answered), the page is no longer blank. -->
-  {#if categories && fontsReady}
-    <ClickGui {categories}
-              {onToggle}
-              onSetting={setSetting}
-              {onTyping}
-              onready={(api) => (gui = api)}
-              active={tab === 0}
-              swipe={guiSwipe}
-              storageKey="liquidbounce-ios-clickgui" />
-  {/if}
+  <!-- The app is laid out in a 1920x1080 design space and scaled to the window and the GUI scale, like the iOS menus (lib/Stage.svelte,
+       lib/stage.svelte.ts). Three layers, because they stack differently: the windows and the Settings page (under the HUD editor), the
+       HUD editor (its HUD components are NOT scaled: they follow Minecraft's GUI scale; only its own pieces are, see tabs/HudEditor.svelte),
+       and the tab bar (over everything, and not covering the HUD editor under it). -->
+  <Stage>
+    <!-- Only the module windows need the module data. The tab bar and the HUD editor / settings pages do not, so they are NOT
+         gated on `categories`: when the GUI is reopened on the HUD editor tab while the modules are still loading (or the load is slow
+         because a previous, abandoned load is still being answered), the page is no longer blank. -->
+    {#if categories && fontsReady}
+      <ClickGui {categories}
+                {onToggle}
+                onSetting={setSetting}
+                {onTyping}
+                onready={(api) => (gui = api)}
+                active={tab === 0}
+                swipe={guiSwipe}
+                storageKey="liquidbounce-ios-clickgui-s1" />
+    {/if}
 
-  <!-- These stay mounted while the GUI leaves and fade by state (`leaving`): unmounting them with a Svelte outro, and then
-       reopening the GUI inside that outro, is what left the page blank. The whole route is removed at the end of the leave. -->
+    <!-- These stay mounted while the GUI leaves and fade by state (`leaving`): unmounting them with a Svelte outro, and then
+         reopening the GUI inside that outro, is what left the page blank. The whole route is removed at the end of the leave. -->
+    {#if settingsMounted}<GlobalSettings leaving={$closing || tab !== 2} ongone={() => { if (tab !== 2) settingsMounted = false; }} />{/if}
+  </Stage>
+
   {#if hudMounted}<HudEditor leaving={$closing || tab !== 1} ongone={() => { if (tab !== 1) hudMounted = false; }} />{/if}
-  {#if settingsMounted}<GlobalSettings leaving={$closing || tab !== 2} ongone={() => { if (tab !== 2) settingsMounted = false; }} />{/if}
-  <TabBar tabs={TABS} bind:active={tab} shown={!$closing && fontsReady} swipe={barSwipe} />
+
+  <Stage passthrough z={100001}>
+    <TabBar tabs={TABS} bind:active={tab} shown={!$closing && fontsReady} swipe={barSwipe} />
+  </Stage>
 </div>
 
 {#if error}

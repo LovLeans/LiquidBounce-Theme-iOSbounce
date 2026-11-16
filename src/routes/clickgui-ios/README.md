@@ -296,3 +296,15 @@ through `--in` (`fadeVar`), never through `opacity` (see below).
   full strength 22 px later, so it grows and fades continuously while scrolling.
   Never fade it with the wrapper's `opacity`: a parent with opacity < 1 stops the backdrop blur from seeing the list, so the
   blur would only pop in at the end (the opacity is on each layer itself).
+
+* **Scaling (any resolution, 4K included).** The whole app (ClickGUI windows, search bar, tab bar, HUD Editor pieces, Settings page) is laid out in a
+  1920x1080 design space and scaled to the window and to the user's GUI scale, exactly like the iOS menus (singleplayer, multiplayer, ...: `routes/menu/ios/IosStage.svelte`,
+  `guiScale.svelte.ts`, so the GUI scale of the main menu's settings app applies here too).
+  * `lib/stage.svelte.ts` holds the numbers: `stage.s` (real px per design px), `stage.w` / `stage.h` (the window in design px). `lib/Stage.svelte` is the
+    layer: `scale(stage.s)` on a box of `stage.w x stage.h`. Inside a layer `position: fixed; inset: 0` is the whole window and `--stage-w` / `--stage-h`
+    replace `vw` / `vh`. Pointer positions are real pixels: divide movements by `stage.s` (see `Panel.svelte`).
+  * Layers (`ClickGuiRoute.svelte`): (1) windows + Settings page, (2) the HUD Editor, (3) the tab bar (`passthrough`, `z-index` above the HUD editor).
+  * The HUD Editor: the HUD components, their selection outline and position badge are NOT scaled (they follow Minecraft's GUI scale, `hud/Hud.svelte`). Scaled:
+    the Add Component pill / menu, the anchor zones and guides, and the popover over each component (`--pop-k` = app scale / HUD zoom, set on `.hud-editor`).
+  * Window positions are in design pixels now, so the layout is the same at 1080p and 4K. The storage key is `liquidbounce-ios-clickgui-s1` (positions saved in
+    real pixels by the old unscaled version are not reused). A saved window that is outside the screen (smaller window, bigger GUI scale) is pulled back in when the GUI is built.

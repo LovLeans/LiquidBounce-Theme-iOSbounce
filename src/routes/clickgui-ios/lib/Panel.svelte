@@ -4,6 +4,7 @@
   import { scroller } from './scroller.js';
   import { spring, retarget, createLoop } from '../../menu/title/main-menu/spring.js';   // the morphing menu's own spring engine
   import { capOvershoot, clamp01 } from './morph.js';
+  import { stage } from './stage.svelte';
 
   // iOS springs, in the SwiftUI / UIKit parametrisation: `response` = period of the undamped spring (s), `ratio` = damping ratio
   // (1 = critically damped, no overshoot; the system `.snappy` is .85, `.smooth` is 1). Change the two lines below to retune.
@@ -102,20 +103,21 @@
   function down(e) {
     if (e.button !== 0) return;
     pressed = true; moved = false;
-    sx = e.clientX; sy = e.clientY; ox = pos.x; oy = pos.y;
+    sx = e.clientX; sy = e.clientY; ox = pos.x; oy = pos.y;   // pointer in real pixels, the position in design pixels (lib/stage.svelte.ts): see move()
     e.currentTarget.setPointerCapture(e.pointerId);
   }
   function move(e) {
     if (!pressed) return;
     if (!moved) {
-      if (Math.hypot(e.clientX - sx, e.clientY - sy) < DRAG_START) return;
+      if (Math.hypot(e.clientX - sx, e.clientY - sy) < DRAG_START * stage.s) return;
       moved = true; dragging = true;
     }
     const w = el.offsetWidth;
     // kept inside the screen while dragging, but the limits always include where the drag started: a window that is outside the current
     // (windowed / resized) screen does not jump when it is picked up, it just cannot be dragged further out
-    pos.x = Math.max(Math.min(4, ox), Math.min(ox + e.clientX - sx, Math.max(innerWidth - w - 4, ox)));
-    pos.y = Math.max(Math.min(4, oy), Math.min(oy + e.clientY - sy, Math.max(innerHeight - 52, oy)));
+    const k = stage.s;   // real pixels per design pixel
+    pos.x = Math.max(Math.min(4, ox), Math.min(ox + (e.clientX - sx) / k, Math.max(stage.w - w - 4, ox)));
+    pos.y = Math.max(Math.min(4, oy), Math.min(oy + (e.clientY - sy) / k, Math.max(stage.h - 52, oy)));
   }
   function up(e) {
     if (!pressed) return;
@@ -159,7 +161,7 @@
     --hh: 42px;    /* header height: the list runs underneath it, so the header's height is a fixed, known value */
     --fade: 48px;  /* length of the edge-blur fade (below the header at the top, above the edge at the bottom) */
     border-radius: 22px; overflow: hidden; display: flex; flex-direction: column;
-    max-height: min(72vh, 680px); min-height: var(--hh);
+    max-height: min(calc(var(--stage-h, 100vh) * .72), 680px); min-height: var(--hh);
     /* Visibility (`--in`, set on the slot by ClickGui.svelte) is applied to each layer separately and never as an `opacity` on
        the window: a parent with opacity < 1 stops the glass from blurring what is behind it. The drop shadow is drawn by the slot. */
     border-color: color-mix(in srgb, var(--cg-stroke) calc(var(--in, 1) * 100%), transparent);

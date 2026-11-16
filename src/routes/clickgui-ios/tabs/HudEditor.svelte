@@ -11,6 +11,8 @@
   import { HORIZONTAL_ANCHOR_ZONES, VERTICAL_ANCHOR_ZONES, HUD_EDITOR_GRID_SIZE } from '../../hud/constants';
   import { clamp01 } from '../lib/morph.js';
   import { createPageMorph } from '../lib/pageMorph.js';
+  import Stage from '../lib/Stage.svelte';
+  import { stage } from '../lib/stage.svelte';
   import AddComponent from './AddComponent.svelte';
   import ComponentSettings from './ComponentSettings.svelte';
 
@@ -44,6 +46,10 @@
   const onDrag = (state) => { dragState = state.dragging ? state : undefined; };
   // HUD coordinates are in "Minecraft pixels": 2 = one pixel per pixel
   const toClient = (v) => (v * scale) / 2;
+  // The HUD components (and the popover that sits on each of them) are drawn at Minecraft's GUI scale (hud/Hud.svelte: zoom = scaleFactor * 50 %).
+  // The editor's own pieces follow the app's scale instead (lib/stage.svelte.ts), so the popover is scaled by the difference (--pop-k, read by
+  // ComponentSettings.svelte). The components themselves, their selection and their position badge stay exactly as they are.
+  const popK = $derived(stage.s / (Math.max(scale, 0.1) / 2));
 
   onMount(() => {
     page = createPageMorph({ apply: paint, onGone: () => ongone() });
@@ -66,23 +72,26 @@
   $effect(() => { const on = !leaving; untrack(() => page?.set(on)); });
 </script>
 
-<div class="hud-editor" class:grid={dragState !== undefined} style="background-size: {HUD_EDITOR_GRID_SIZE}px {HUD_EDITOR_GRID_SIZE}px" class:leaving={leaving}>
+<div class="hud-editor" class:grid={dragState !== undefined} style="background-size: {HUD_EDITOR_GRID_SIZE}px {HUD_EDITOR_GRID_SIZE}px" style:--pop-k={popK} class:leaving={leaving}>
   <!-- Only this layer fades when the page is left (the components, the zones, the guides). It is NOT done with an opacity / animation on
        the page itself: the Add Component pill / menu must not sit under a parent with opacity < 1 while it is open (its edge-blur layers would stop seeing the
        list). It has its own enter / leave (AddComponent.svelte). -->
   <div class="layer" bind:this={layerEl}>
     {#if dragState}
-      <div class="zones">
-        {#each VERTICAL_ANCHOR_ZONES as v (v)}
-          {#each HORIZONTAL_ANCHOR_ZONES as h (h)}
-            <div class="zone" class:active={dragState.verticalZone === v && dragState.horizontalZone === h}>
-              <i class="dot h-{h} v-{v}"></i>
-            </div>
+      <!-- the zones and the guides are the editor's own pieces: drawn in the app's scale (their positions are in real pixels / HUD pixels, hence the division) -->
+      <Stage passthrough>
+        <div class="zones">
+          {#each VERTICAL_ANCHOR_ZONES as v (v)}
+            {#each HORIZONTAL_ANCHOR_ZONES as h (h)}
+              <div class="zone" class:active={dragState.verticalZone === v && dragState.horizontalZone === h}>
+                <i class="dot h-{h} v-{v}"></i>
+              </div>
+            {/each}
           {/each}
-        {/each}
-      </div>
-      {#if dragState.verticalGuide !== undefined}<i class="guide vertical" style="left:{toClient(dragState.verticalGuide)}px"></i>{/if}
-      {#if dragState.horizontalGuide !== undefined}<i class="guide horizontal" style="top:{toClient(dragState.horizontalGuide)}px"></i>{/if}
+        </div>
+        {#if dragState.verticalGuide !== undefined}<i class="guide vertical" style="left:{toClient(dragState.verticalGuide) / stage.s}px"></i>{/if}
+        {#if dragState.horizontalGuide !== undefined}<i class="guide horizontal" style="top:{toClient(dragState.horizontalGuide) / stage.s}px"></i>{/if}
+      </Stage>
     {/if}
 
     {#if selected}
@@ -93,7 +102,7 @@
   <!-- A crash inside the Add Component pill must never take the whole editor (components, zones, guides) down with it: the boundary
        keeps the rest alive and shows what went wrong (the same text is in the console). -->
   <svelte:boundary onerror={(e) => console.error('[ios-clickgui] the Add Component menu crashed', e)}>
-    <AddComponent visible={appear && !leaving} />
+    <Stage passthrough z={100000}><AddComponent visible={appear && !leaving} /></Stage>
     {#snippet failed(error)}
       <p class="add-failed" role="alert">Add Component crashed: {error instanceof Error ? error.message : String(error)}{error instanceof Error && error.stack ? ' | ' + error.stack.split('\n').slice(1, 4).map((l) => l.trim()).join(' | ') : ''}</p>
     {/snippet}
