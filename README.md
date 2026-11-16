@@ -74,4 +74,4 @@ iOSbounce is made by LovLean. It is based on the LiquidBounce default theme by [
 
 The Inter font in `public/fonts/` is © The Inter Project Authors and is licensed under the SIL Open Font License 1.1 (see [`public/fonts/OFL.txt`](public/fonts/OFL.txt)).
 
-Made with extra 💜
+Made with extra 💜 All Lovleans
