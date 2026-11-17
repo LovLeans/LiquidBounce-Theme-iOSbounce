@@ -21,4 +21,4 @@
 
 Feel free to point out bugs, At @YuriErotica Telegram if you needed contact.
 
-Made with extra 💜 #### All Lovleans
+Made with extra 💜 All Lovleans
