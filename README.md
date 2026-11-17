@@ -13,8 +13,7 @@
 ### Install
 (temporary until the theme gets verified)
 1. In the client, run `.client theme browse` to open the themes folder (or in the C:\Users\YOURUSER\AppData\Roaming\CCBlueX\LiquidLauncher\data\gameDir\nextgen\LiquidBounce\marketplace\items\721\4980\paste it here (the two last folder's numbers might be different, which is fine, you need to have at least one theme installed from the liquidlauncher itself, delete the dist of it, then paste the iosbounce folder in.)
-2. Unzip the download there.
-3. Apply it with `.client theme set iosbounce`.
+2. Apply it with `.client theme set iosbounce`.
 
 Feel free to point out bugs, At @YuriErotica Telegram if you needed contact.
 
