@@ -12,7 +12,7 @@
 
 ### Install
 
-#### Auto (Recommanded):
+#### Auto (Recommended):
 1. In the client, just paste `.client theme set iosbounce` in, then you're all set, you can also install it from the liquidlauncher's theme section itself.
 
 #### Manual:
