@@ -1,9 +1,9 @@
 # iOSbounce
 
 <p align="center">
-  <img src="screenshots/main-menu.png" width="32%">
-  <img src="screenshots/wallpaper-editor.png" width="32%">
-  <img src="screenshots/hud.png" width="32%">
+  <img src="screenshots/main-menu.png" width="100%">
+  <img src="screenshots/wallpaper-editor.png" width="100%">
+  <img src="screenshots/hud.png" width="100%">
 </p>
 
 ## Download
