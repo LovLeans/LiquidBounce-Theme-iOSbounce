@@ -8,7 +8,7 @@
 
 ## Download
 
-**[Download the latest build](../../releases/latest/download/iosbounce.zip)**: compiled from the newest commit.
+**[Download the latest build](../../releases/latest/download/iosbounce.zip)** compiled from the newest commit.
 
 ### Install
 (temporary until the theme gets verified)
