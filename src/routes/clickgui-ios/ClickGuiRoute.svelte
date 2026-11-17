@@ -117,7 +117,7 @@
      (no backdrop blurs while a window carries the layer, button font, focus ring) reach the tabs -->
 <div class="clickgui cgx">
   <!-- The app is laid out in a 1920x1080 design space and scaled to the window and the GUI scale, like the iOS menus (lib/Stage.svelte,
-       lib/stage.svelte.ts). Three layers, because they stack differently: the windows and the Settings page (under the HUD editor), the
+       lib/stageMetrics.svelte.ts). Three layers, because they stack differently: the windows and the Settings page (under the HUD editor), the
        HUD editor (its HUD components are NOT scaled: they follow Minecraft's GUI scale; only its own pieces are, see tabs/HudEditor.svelte),
        and the tab bar (over everything, and not covering the HUD editor under it). -->
   <Stage>

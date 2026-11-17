@@ -20,7 +20,7 @@
   import { clamp01 } from '../lib/morph.js';
   import { createPageMorph } from '../lib/pageMorph.js';
   import { spaced, soft } from './settings/util.js';
-  import { stage } from '../lib/stage.svelte';
+  import { stage } from '../lib/stageMetrics.svelte';
   import Setting from './settings/Setting.svelte';
 
   // The window's visibility is the number `--in` (0..1), never an `opacity` on the window: a parent with opacity < 1 stops the glass and
@@ -182,5 +182,5 @@
   .pb .b3 { --s: calc(var(--o) * .75); --e: calc(var(--o) + var(--fade) * .72); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); }
   .pb .b2 { --s: calc(var(--o) * .90); --e: calc(var(--o) + var(--fade) * .90); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); }
   .pb .b1 { --s: var(--o);             --e: calc(var(--o) + var(--fade));       -webkit-backdrop-filter: blur(1px); backdrop-filter: blur(1px); }
-  .cols.one { grid-template-columns: 1fr; }   /* a narrow window (in design pixels, see lib/stage.svelte.ts) */
+  .cols.one { grid-template-columns: 1fr; }   /* a narrow window (in design pixels, see lib/stageMetrics.svelte.ts) */
 </style>

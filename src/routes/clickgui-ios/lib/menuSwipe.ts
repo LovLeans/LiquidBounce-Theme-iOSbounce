@@ -1,4 +1,4 @@
-import { stage } from './stage.svelte';
+import { stage } from './stageMetrics.svelte';
 
 /**
  * Menu swipe animation: the "apps zoom in from the camera" physics, driving whole menus.
@@ -268,7 +268,7 @@ export class MenuSwipe {
       dmax = Math.max(dmax, Math.hypot(a.dx, a.dy));
     }
     if (this.peer) dmax = Math.max(dmax, this.peer.reach());
-    // the UI is laid out in design pixels (lib/stage.svelte.ts), so the screen is `stage.w x stage.h` here, not the window's real size
+    // the UI is laid out in design pixels (lib/stageMetrics.svelte.ts), so the screen is `stage.w x stage.h` here, not the window's real size
     if (this.reachFloor > 0) {
       dmax = Math.max(dmax, this.reachFloor * Math.hypot(stage.w / 2, stage.h / 2));
     }

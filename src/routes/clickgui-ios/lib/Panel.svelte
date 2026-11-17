@@ -4,7 +4,7 @@
   import { scroller } from './scroller.js';
   import { spring, retarget, createLoop } from '../../menu/title/main-menu/spring.js';   // the morphing menu's own spring engine
   import { capOvershoot, clamp01 } from './morph.js';
-  import { stage } from './stage.svelte';
+  import { stage } from './stageMetrics.svelte';
 
   // iOS springs, in the SwiftUI / UIKit parametrisation: `response` = period of the undamped spring (s), `ratio` = damping ratio
   // (1 = critically damped, no overshoot; the system `.snappy` is .85, `.smooth` is 1). Change the two lines below to retune.
@@ -103,7 +103,7 @@
   function down(e) {
     if (e.button !== 0) return;
     pressed = true; moved = false;
-    sx = e.clientX; sy = e.clientY; ox = pos.x; oy = pos.y;   // pointer in real pixels, the position in design pixels (lib/stage.svelte.ts): see move()
+    sx = e.clientX; sy = e.clientY; ox = pos.x; oy = pos.y;   // pointer in real pixels, the position in design pixels (lib/stageMetrics.svelte.ts): see move()
     e.currentTarget.setPointerCapture(e.pointerId);
   }
   function move(e) {

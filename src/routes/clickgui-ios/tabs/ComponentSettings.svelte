@@ -22,11 +22,11 @@
   import { rememberOptions, applyOptionsToTree } from '../../hud/options';
   import Setting from './settings/Setting.svelte';
   import { pressPhysics } from '../../menu/title/main-menu/pressPhysics';
-  import { stage } from '../lib/stage.svelte';
+  import { stage } from '../lib/stageMetrics.svelte';
 
   let { name, id, alignment, onRemoved = undefined, overlayOffset = 0 } = $props();
 
-  const EDGE = 10; // keep this far from the screen edge (in design pixels, lib/stage.svelte.ts)
+  const EDGE = 10; // keep this far from the screen edge (in design pixels, lib/stageMetrics.svelte.ts)
   const POP_W = 224; // the popover's width (.pop below)
 
   let el = $state();

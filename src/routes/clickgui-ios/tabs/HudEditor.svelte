@@ -12,7 +12,7 @@
   import { clamp01 } from '../lib/morph.js';
   import { createPageMorph } from '../lib/pageMorph.js';
   import Stage from '../lib/Stage.svelte';
-  import { stage } from '../lib/stage.svelte';
+  import { stage } from '../lib/stageMetrics.svelte';
   import AddComponent from './AddComponent.svelte';
   import ComponentSettings from './ComponentSettings.svelte';
 
@@ -47,7 +47,7 @@
   // HUD coordinates are in "Minecraft pixels": 2 = one pixel per pixel
   const toClient = (v) => (v * scale) / 2;
   // The HUD components (and the popover that sits on each of them) are drawn at Minecraft's GUI scale (hud/Hud.svelte: zoom = scaleFactor * 50 %).
-  // The editor's own pieces follow the app's scale instead (lib/stage.svelte.ts), so the popover is scaled by the difference (--pop-k, read by
+  // The editor's own pieces follow the app's scale instead (lib/stageMetrics.svelte.ts), so the popover is scaled by the difference (--pop-k, read by
   // ComponentSettings.svelte). The components themselves, their selection and their position badge stay exactly as they are.
   const popK = $derived(stage.s / (Math.max(scale, 0.1) / 2));
 

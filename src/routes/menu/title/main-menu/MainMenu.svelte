@@ -476,7 +476,7 @@
 		seen: () => menuLink.seen,
 		now: () => performance.now()
 	});
-	const requestScreen = (id: string, name: string) => requests.request(id, name);
+	const requestScreen = (id: string, name: string, force = false) => requests.request(id, name, force);
 
 	// ---------- handing a window over to one of the client's own screens (Settings) ----------
 	// The client's screens cannot be drawn by the page, so a window of that kind (Settings) asks for its screen as soon as it has finished
@@ -485,6 +485,54 @@
 
 	/** is a window open (or opening) that shows a screen of the page? */
 	const earlyOpen = () => !!launcher && WINS.some((id) => early(id) && launcher!.isOpen(id));
+	/**
+	 * Is a window open (or opening) that asks the client for a screen, page screen or native one (Settings)? This is what the router
+	 * means by "busy" (menuLink.busy): while it is true a stray screen of an app that was closed a moment ago must not send the client
+	 * back to the title, because that title replaces the screen this window asked for. Settings was left out of it (its screen is not a page
+	 * screen), so closing an app and opening Settings right away got Settings' screen replaced or never shown: an empty window.
+	 */
+	const askingOpen = () => !!launcher && WINS.some((id) => !!REAL_SCREEN[id] && launcher!.isOpen(id));
+
+	// A native screen (Settings) is asked for once its window has finished opening. If the client never opens it (the request was
+	// dropped, replaced by a screen that arrived late, or it failed), the window would stay empty until it is closed and opened again.
+	// While the menu is still mounted with that window open and settled, the client has not taken over (it removes the menu when it
+	// does), so the screen is asked for again.
+	// When the menu itself asked the client for the title (below), the title that opens is not the client coming back from a native
+	// screen: it must not close the window that is waiting for its screen (that was Settings shrinking back by itself).
+	let titleAsked = -1e9;
+	/**
+	 * Ask the client for a native screen (Settings). A window closed from the page (not by Esc on its screen) leaves the client on that
+	 * app's screen (the last one it reported), and a screen asked for from there was not opened: the window stayed empty until it was
+	 * closed and opened again. So the client is taken back to the title first.
+	 */
+	async function openNative(id: string, name: string) {
+		const cur = menuLink.seen.name;
+		if (cur && cur !== 'title' && cur !== 'none') {
+			console.log(`[Menu] the client is still on ${cur}: asking for the title before ${name}`);
+			titleAsked = performance.now();
+			await LB.openScreen('title');
+			await new Promise((r) => setTimeout(r, 250));
+			if (!launcher?.isOpen(id)) return;
+		}
+		console.log(`[Menu] asking for ${name}`);
+		requestScreen(id, name, true);
+		watchNative(id, name);
+	}
+
+	const NATIVE_RETRY_MS = 1400;
+	const NATIVE_RETRIES = 2;
+	let nativeT: ReturnType<typeof setTimeout> | undefined;
+	function watchNative(id: string, name: string, left = NATIVE_RETRIES) {
+		clearTimeout(nativeT);
+		nativeT = setTimeout(() => {
+			// closed, or opening again: that open asks (and watches) for itself
+			if (!launcher?.isOpen(id) || launcher.openingProgress(id) !== null) return;
+			if (menuLink.seen.name === name) return; // the client reports it as open
+			console.log(`[Menu] ${name} was not opened by the client: asking again`);
+			requestScreen(id, name, true);
+			if (left > 1) watchNative(id, name, left - 1);
+		}, NATIVE_RETRY_MS);
+	}
 	/** is a window that shows a screen of the page still on screen at all, including one that is shrinking back into its icon? */
 	const earlyActive = () => !!launcher && WINS.some((id) => early(id) && launcher!.isActive(id));
 
@@ -569,7 +617,7 @@
 				const s = REAL_SCREEN[id];
 				if (s && NATIVE_SCREEN.has(id)) {
 					resume.id = id;
-					requestScreen(id, s);
+					void openNative(id, s);
 				}
 			}
 		});
@@ -581,6 +629,7 @@
 		const onTitleOpen = () => {
 			const id = resume.id;
 			if (overlayActive || !id || !launcher?.isOpen(id)) return;
+			if (performance.now() - titleAsked < 1500) return; // the title this menu asked for itself (see openNative)
 			resume.id = null;
 			launcher.close(id);
 		};
@@ -592,7 +641,7 @@
 			const id = SCREEN_APP[screen];
 			return !!id && !!launcher?.isOpen(id);
 		};
-		menuLink.busy = earlyOpen;
+		menuLink.busy = askingOpen;
 		// the page's own Cancel / Back buttons: start the shrink on the click instead of when the client has answered
 		menuLink.closeNow = (screen) => {
 			const id = SCREEN_APP[screen];
@@ -638,7 +687,7 @@
 		return () => {
 			stopWarm();
 			requests.dispose();
-			if (menuLink.busy === earlyOpen) {
+			if (menuLink.busy === askingOpen) {
 				menuLink.busy = null;
 				menuLink.expects = null;
 				menuLink.closeNow = null;
@@ -651,6 +700,7 @@
 			window.removeEventListener('click', onCancelClick, true);
 			ro.disconnect();
 			clearTimeout(clockT);
+			clearTimeout(nativeT);
 			clearTimeout(toastT);
 			clearTimeout(edxT);
 			if (pd) clearTimeout(pd.t);

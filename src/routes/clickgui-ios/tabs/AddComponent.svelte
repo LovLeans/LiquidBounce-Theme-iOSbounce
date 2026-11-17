@@ -13,7 +13,7 @@
 <script lang="ts">
   import { onMount, tick as nextTick, untrack } from "svelte";
   import { scroller, scrollTo } from "../lib/scroller.js";
-  import { stage } from "../lib/stage.svelte";
+  import { stage } from "../lib/stageMetrics.svelte";
   import { getMetadata, getComponentCatalog, addComponent } from "../../../integration/rest";
   import type { HudComponentCatalogEntry } from "../../../integration/types";
   import { reloadHud } from "../../hud/reload";
@@ -162,7 +162,7 @@
 
   // the pill never moves: the menu height is capped to the room below it
   function size(): [number, number] {
-    // everything here is in design pixels (lib/stage.svelte.ts): the window is stage.w x stage.h, the pill's top is a real-pixel measure
+    // everything here is in design pixels (lib/stageMetrics.svelte.ts): the window is stage.w x stage.h, the pill's top is a real-pixel measure
     const top = morph.parentElement!.getBoundingClientRect().top / stage.s;
     return [Math.round(Math.min(MAXW, stage.w - 24)), Math.round(Math.max(220, Math.min(MAXH, stage.h - top - SHADOW_ROOM)))];
   }

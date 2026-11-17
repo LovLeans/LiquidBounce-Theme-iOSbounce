@@ -1,5 +1,5 @@
 <!--
-  Scaled layer of the ClickGUI app (see lib/stage.svelte.ts): a box that is `stage.w x stage.h` design pixels, drawn with
+  Scaled layer of the ClickGUI app (see lib/stageMetrics.svelte.ts): a box that is `stage.w x stage.h` design pixels, drawn with
   `scale(stage.s)`, so it fills the whole window at any resolution and everything inside is laid out in design pixels. It
   works like routes/menu/ios/IosStage.svelte (1080p design, window scale x GUI scale).
 
@@ -11,7 +11,7 @@
 -->
 <script lang="ts">
   import type { Snippet } from 'svelte';
-  import { stage } from './stage.svelte';
+  import { stage } from './stageMetrics.svelte';
 
   let { children, passthrough = false, z = undefined }: { children?: Snippet; passthrough?: boolean; z?: number } = $props();
 </script>

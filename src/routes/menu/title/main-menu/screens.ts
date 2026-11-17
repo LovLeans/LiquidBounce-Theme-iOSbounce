@@ -32,14 +32,15 @@ export class ScreenRequests {
 
 	constructor(private o: ScreenRequestsOpts) {}
 
-	request(id: string, name: string) {
+	/** `force`: ask even when the same screen was asked for a moment ago (a window that was opened again needs its own answer). */
+	request(id: string, name: string, force = false) {
 		const seq = ++this.seq;
 		this.queue = this.queue
 			.then(async () => {
 				if (this.dead || seq !== this.seq || !this.o.isOpen(id)) return;
 				const now = this.o.now();
 				const seen = this.o.seen();
-				if (this.last.name === name && now - this.last.at < SAME_SCREEN_MS && (seen.at < this.last.at || seen.name === name)) return;
+				if (!force && this.last.name === name && now - this.last.at < SAME_SCREEN_MS && (seen.at < this.last.at || seen.name === name)) return;
 				this.last = { name, at: now };
 				await this.o.send(name);
 			})

@@ -49,7 +49,7 @@
     Default layout: rows with a gap (only for windows without a saved position). Windows never move by themselves: resizing the screen / windowed mode leaves them where they are.
     Windows start COLLAPSED the first time (set startCollapsed={false} to start open); after that the GUI reopens the way it was left.
     Expanding/collapsing a window plays a blur + fade + slide, like the settings drawer.
-    The GUI is laid out in a 1920x1080 design space that is scaled to the window and the GUI scale (lib/Stage.svelte, lib/stage.svelte.ts), so
+    The GUI is laid out in a 1920x1080 design space that is scaled to the window and the GUI scale (lib/Stage.svelte, lib/stageMetrics.svelte.ts), so
     positions are in design pixels and look the same at any resolution.
     Window positions are saved to localStorage under `storageKey`; which windows / module drawers are open under `<storageKey>:open`,
     guarded so it silently skips if storage is unavailable. Clear that key to reset positions.
@@ -81,7 +81,7 @@
   import Panel from './Panel.svelte';
   import Search from './Search.svelte';
   import { flash, useOpenMemory, rememberedWindows, rememberWindows } from './stores.js';
-  import { stage } from './stage.svelte';
+  import { stage } from './stageMetrics.svelte';
 
   let { categories = [], onToggle = () => {}, onSetting = () => {}, onTyping = () => {}, storageKey = 'ios-clickgui-layout', startCollapsed = true, onready = () => {}, active = true, swipe: swipeProp = null } = $props();   // active: false while another tab (HUD editor, settings) is shown: the windows leave like on closing
 
@@ -183,7 +183,7 @@
   useOpenMemory(storageKey);
   const wasOpen = rememberedWindows();
   function initial() {
-    // laid out in design pixels (lib/stage.svelte.ts), so a window is in the same place at 1080p, 1440p and 4K
+    // laid out in design pixels (lib/stageMetrics.svelte.ts), so a window is in the same place at 1080p, 1440p and 4K
     const g = grid(stage.w, stage.h);
     const d = Object.fromEntries(names.map((k, i) => [k, { x: g[i].x, y: g[i].y, z: i + 1, collapsed: wasOpen ? !wasOpen.has(k) : startCollapsed }]));
     try {
